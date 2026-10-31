@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cem_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cem_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cem_secure_password_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-cem_db}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT:-5434}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/init_schemas.sql:/docker-entrypoint-initdb.d/01_init_schemas.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cem_admin} -d ${POSTGRES_DB:-cem_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cem_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
+      - DATABASE_URL=postgresql+psycopg2://cem_admin:cem_secure_password_2026@postgres:5432/cem_db
+      - ASYNC_DATABASE_URL=postgresql+asyncpg://cem_admin:cem_secure_password_2026@postgres:5432/cem_db
+      - SECRET_KEY=cemetery-secret-key-for-development-mode-only
+      - AUDIT_HMAC_SECRET=cemetery-hmac-sha256-audit-secret-key-32bytes-min
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./backend:/app
+      - /app/.venv
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cem_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
+    ports:
+      - "3002:3000"
+
+volumes:
+  postgres_data:
