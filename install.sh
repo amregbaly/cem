@@ -127,7 +127,7 @@ POSTGRES_DB=cem_db
 POSTGRES_PORT=5432
 DATABASE_URL=postgresql+psycopg2://cem_admin:cem_secure_password_2026@localhost:5432/cem_db
 
-NEXT_PUBLIC_API_URL=http://localhost:8001
+NEXT_PUBLIC_API_URL=
 NEXT_PUBLIC_DEFAULT_LOCALE=es
 ENVEOF
         fi
@@ -275,7 +275,7 @@ ENVEOF
     info "Instalando dependencias del Frontend y compilando paquete de producción..."
     cd "$PROJECT_DIR/frontend"
     npm install
-    NEXT_PUBLIC_API_URL="http://localhost:8001" npm run build
+    NEXT_PUBLIC_API_URL="" npm run build
     success "Frontend compilado correctamente."
 
     # 3. Crear servicios systemd para arranque automático
@@ -429,7 +429,7 @@ print('Base de datos PostgreSQL inicializada.')
     info "Instalando dependencias del Frontend y compilando paquete de producción..."
     cd "$PROJECT_DIR/frontend"
     npm install
-    NEXT_PUBLIC_API_URL="http://localhost:8001" npm run build
+    NEXT_PUBLIC_API_URL="" npm run build
     success "Frontend compilado correctamente."
 
     # 4. Crear servicios systemd para arranque automático
