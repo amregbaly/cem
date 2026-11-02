@@ -76,10 +76,20 @@ def crear_tarea_terreno(
         raise HTTPException(status_code=404, detail="Cementerio no encontrado")
 
     folio = f"ORD-{date.today().year}-{uuid.uuid4().hex[:6].upper()}"
+    ubic_id = tarea_in.ubicacion_id
+    if not ubic_id and tarea_in.codigo_ubicacion:
+        clean_code = tarea_in.codigo_ubicacion.strip().upper()
+        # Find matching location in cemetery by comparing computed codigo_completo
+        candidate = db.query(Ubicacion).filter(Ubicacion.cementerio_id == tarea_in.cementerio_id).all()
+        for u in candidate:
+            if u.codigo_completo.upper() == clean_code:
+                ubic_id = u.id
+                break
+
     nueva = TareaTerreno(
         folio_orden=folio,
         cementerio_id=tarea_in.cementerio_id,
-        ubicacion_id=tarea_in.ubicacion_id,
+        ubicacion_id=ubic_id,
         tipo_tarea=tarea_in.tipo_tarea.upper(),
         estado="PENDIENTE",
         fallecido_nombre=tarea_in.fallecido_nombre,

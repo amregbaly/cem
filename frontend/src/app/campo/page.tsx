@@ -16,7 +16,10 @@ import {
   User, 
   ShieldCheck,
   ChevronRight,
-  Filter
+  Filter,
+  Plus,
+  X,
+  Sparkles
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -54,6 +57,41 @@ export default function ModoTerrenoPage() {
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(true);
+
+  // New order modal state
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [creating, setCreating] = useState<boolean>(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState({
+    cementerio_id: 1,
+    tipo_tarea: "INHUMACION",
+    codigo_ubicacion: "",
+    fecha_programada: new Date().toISOString().split("T")[0],
+    hora_programada: "11:00",
+    fallecido_nombre: "",
+    rut_fallecido: "",
+    solicitante_nombre: "",
+    sepulturero_asignado: "Cuadrilla 1 (Héctor & Manuel)",
+    observaciones: ""
+  });
+
+  // Check URL query parameters for prefill
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("crear") === "true") {
+        setShowCreateModal(true);
+      }
+      if (urlParams.get("ubicacion")) {
+        setFormData(prev => ({ ...prev, codigo_ubicacion: urlParams.get("ubicacion") || "" }));
+      }
+      if (urlParams.get("cementerio")) {
+        setFormData(prev => ({ ...prev, cementerio_id: Number(urlParams.get("cementerio")) || 1 }));
+      }
+    }
+  }, []);
 
   // Monitor browser online status
   useEffect(() => {
@@ -182,6 +220,54 @@ export default function ModoTerrenoPage() {
     }
   };
 
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreating(true);
+    setCreateError(null);
+    setCreateSuccess(null);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${apiUrl}/api/v1/terreno/tarea`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          cementerio_id: Number(formData.cementerio_id),
+          tipo_tarea: formData.tipo_tarea,
+          codigo_ubicacion: formData.codigo_ubicacion.trim() || undefined,
+          fecha_programada: formData.fecha_programada,
+          hora_programada: formData.hora_programada,
+          fallecido_nombre: formData.fallecido_nombre.trim() || undefined,
+          rut_fallecido: formData.rut_fallecido.trim() || undefined,
+          solicitante_nombre: formData.solicitante_nombre.trim() || undefined,
+          sepulturero_asignado: formData.sepulturero_asignado.trim() || "Cuadrilla 1",
+          observaciones: formData.observaciones.trim() || undefined
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Error al emitir la orden de terreno.");
+      }
+
+      const created = await res.json();
+      setCreateSuccess(`Orden ${created.folio_orden} emitida con éxito.`);
+      setTimeout(() => {
+        setShowCreateModal(false);
+        setCreateSuccess(null);
+      }, 1200);
+
+      // Refresh agenda
+      fetchAgenda();
+    } catch (err: any) {
+      setCreateError(err.message || "Error al conectar con el servidor.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const getTaskBadge = (tipo: string, estado: string) => {
     const isCompleted = estado === "COMPLETADA";
     if (isCompleted) {
@@ -265,6 +351,28 @@ export default function ModoTerrenoPage() {
           style={{ borderColor: "var(--color-border)" }}
         >
           Cachapoal
+        </button>
+      </div>
+
+      {/* Action Bar: Create Order & Agenda Info */}
+      <div 
+        className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl border bg-slate-50/50 dark:bg-slate-900/40"
+        style={{ borderColor: "var(--color-border)" }}
+      >
+        <div className="flex items-center space-x-2 text-xs font-bold" style={{ color: "var(--color-text)" }}>
+          <Calendar className="w-4 h-4 text-amber-500" />
+          <span>Agenda Operativa</span>
+          <span className="text-[11px] font-normal text-gray-400">
+            ({agenda.length} faena{agenda.length !== 1 ? 's' : ''})
+          </span>
+        </div>
+
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <Plus className="w-4 h-4" />
+          <span>+ Nueva Orden de Faena</span>
         </button>
       </div>
 
@@ -430,6 +538,228 @@ export default function ModoTerrenoPage() {
                 Cerrar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Task / Order Creation Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div 
+            className="w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto"
+            style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--color-border)" }}>
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <HardHat className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base" style={{ color: "var(--color-text)" }}>
+                    Emitir Nueva Orden de Faena
+                  </h3>
+                  <p className="text-xs text-gray-400">Asignar tarea operativa a cuadrilla de terreno</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowCreateModal(false)} 
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Error / Success Feedback */}
+            {createError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{createError}</span>
+              </div>
+            )}
+            {createSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-xs flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{createSuccess}</span>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleCreateOrder} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Cemetery */}
+                <div>
+                  <label className="font-bold block mb-1" style={{ color: "var(--color-text)" }}>
+                    Cementerio Municipal *
+                  </label>
+                  <select
+                    value={formData.cementerio_id}
+                    onChange={(e) => setFormData({ ...formData, cementerio_id: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border bg-transparent font-medium outline-none focus:border-amber-500"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  >
+                    <option value={1}>Cementerio Municipal San Carlos</option>
+                    <option value={2}>Cementerio Municipal Cachapoal</option>
+                  </select>
+                </div>
+
+                {/* Task Type */}
+                <div>
+                  <label className="font-bold block mb-1" style={{ color: "var(--color-text)" }}>
+                    Tipo de Faena *
+                  </label>
+                  <select
+                    value={formData.tipo_tarea}
+                    onChange={(e) => setFormData({ ...formData, tipo_tarea: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border bg-transparent font-medium outline-none focus:border-amber-500"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  >
+                    <option value="INHUMACION">Inhumación (Sepultación)</option>
+                    <option value="APERTURA_FOSA">Apertura / Preparación de Fosa</option>
+                    <option value="EXHUMACION">Exhumación / Reducción</option>
+                    <option value="MANTENCION">Mantención / Obras Civiles</option>
+                  </select>
+                </div>
+
+                {/* Location code */}
+                <div>
+                  <label className="font-bold block mb-1" style={{ color: "var(--color-text)" }}>
+                    Código Sepultura / Ubicación
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: PAB-A-F01-N001"
+                    value={formData.codigo_ubicacion}
+                    onChange={(e) => setFormData({ ...formData, codigo_ubicacion: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 rounded-xl border bg-transparent font-mono uppercase outline-none focus:border-amber-500"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  />
+                </div>
+
+                {/* Crew assigned */}
+                <div>
+                  <label className="font-bold block mb-1" style={{ color: "var(--color-text)" }}>
+                    Cuadrilla / Operario Asignado
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Cuadrilla 1 (Héctor & Manuel)"
+                    value={formData.sepulturero_asignado}
+                    onChange={(e) => setFormData({ ...formData, sepulturero_asignado: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border bg-transparent outline-none focus:border-amber-500"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  />
+                </div>
+
+                {/* Date */}
+                <div>
+                  <label className="font-bold block mb-1" style={{ color: "var(--color-text)" }}>
+                    Fecha Programada *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.fecha_programada}
+                    onChange={(e) => setFormData({ ...formData, fecha_programada: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border bg-transparent outline-none focus:border-amber-500"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  />
+                </div>
+
+                {/* Time */}
+                <div>
+                  <label className="font-bold block mb-1" style={{ color: "var(--color-text)" }}>
+                    Hora Programada
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.hora_programada}
+                    onChange={(e) => setFormData({ ...formData, hora_programada: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border bg-transparent outline-none focus:border-amber-500"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  />
+                </div>
+
+                {/* Deceased Name */}
+                <div>
+                  <label className="font-bold block mb-1" style={{ color: "var(--color-text)" }}>
+                    Nombre del Fallecido
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Nombre y Apellidos"
+                    value={formData.fallecido_nombre}
+                    onChange={(e) => setFormData({ ...formData, fallecido_nombre: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 rounded-xl border bg-transparent outline-none focus:border-amber-500"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  />
+                </div>
+
+                {/* Deceased RUT */}
+                <div>
+                  <label className="font-bold block mb-1" style={{ color: "var(--color-text)" }}>
+                    RUT Fallecido
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="12.345.678-9"
+                    value={formData.rut_fallecido}
+                    onChange={(e) => setFormData({ ...formData, rut_fallecido: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border bg-transparent outline-none focus:border-amber-500"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  />
+                </div>
+              </div>
+
+              {/* Solicitante */}
+              <div>
+                <label className="font-bold block mb-1" style={{ color: "var(--color-text)" }}>
+                  Solicitante / Contacto Familiar
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nombre de contacto o familiar responsable"
+                  value={formData.solicitante_nombre}
+                  onChange={(e) => setFormData({ ...formData, solicitante_nombre: e.target.value.toUpperCase() })}
+                  className="w-full px-3 py-2 rounded-xl border bg-transparent outline-none focus:border-amber-500"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                />
+              </div>
+
+              {/* Instructions */}
+              <div>
+                <label className="font-bold block mb-1" style={{ color: "var(--color-text)" }}>
+                  Instrucciones Técnicas / Observaciones
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Instrucciones específicas para la cuadrilla en terreno..."
+                  value={formData.observaciones}
+                  onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border bg-transparent outline-none focus:border-amber-500"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                />
+              </div>
+
+              {/* Modal Actions */}
+              <div className="pt-2 flex items-center justify-end space-x-2 border-t" style={{ borderColor: "var(--color-border)" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  disabled={creating}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 transition-all shadow-md shadow-amber-500/20 disabled:opacity-50"
+                >
+                  {creating ? "Emitiendo Orden..." : "Emitir Orden de Terreno"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

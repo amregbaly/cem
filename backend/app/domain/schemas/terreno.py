@@ -4,8 +4,9 @@ from pydantic import BaseModel, ConfigDict
 
 
 class TareaTerrenoCreate(BaseModel):
-    cementerio_id: int
+    cementerio_id: int = 1
     ubicacion_id: Optional[int] = None
+    codigo_ubicacion: Optional[str] = None
     tipo_tarea: str = "INHUMACION"
     fallecido_nombre: Optional[str] = None
     rut_fallecido: Optional[str] = None

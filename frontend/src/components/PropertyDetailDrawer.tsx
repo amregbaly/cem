@@ -447,7 +447,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                 </button>
 
                 <a
-                  href={`/campo`}
+                  href={`/campo?crear=true&ubicacion=${encodeURIComponent(slot.codigo_completo || '')}&cementerio=${slot.cementerio?.toLowerCase().includes('cachapoal') ? 2 : 1}`}
                   className="w-full p-4 rounded-2xl border text-left flex items-start space-x-3.5 hover:border-amber-500 hover:bg-amber-50/20 transition-all group block"
                   style={{ borderColor: "var(--color-border)" }}
                 >
