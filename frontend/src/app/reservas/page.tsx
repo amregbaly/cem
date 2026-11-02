@@ -113,7 +113,7 @@ export default function ReservasPage() {
   const [isLiberando, setIsLiberando] = useState(false);
   const [liberarError, setLiberarError] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
 
   const fetchReservas = async () => {
     setLoading(true);

@@ -198,7 +198,7 @@ export default function AutocompleteSearch({ onSelect, onSelectSlot, className =
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+        const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
         const res = await fetch(`${apiUrl}/api/v1/busqueda/autocomplete?q=${encodeURIComponent(query)}`);
         if (res.ok) {
           const data = await res.json();

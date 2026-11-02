@@ -487,6 +487,95 @@ SYSTEMD_FRONTEND
     cd "$PROJECT_DIR"
 }
 
+# ─── Configurar Nginx como Reverse Proxy (OPCIONAL) ──────────────────────────
+# Crea /etc/nginx/sites-available/cem y lo habilita.
+# Requiere que nginx esté instalado y que el certificado SSL ya exista.
+# Si no hay nginx instalado lo omite graciosamente.
+setup_nginx() {
+    local domain="${1:-}"
+    local cert_path="${2:-}"
+    local key_path="${3:-}"
+
+    if ! command -v nginx > /dev/null 2>&1; then
+        warn "Nginx no está instalado. Omitiendo configuración de proxy. El frontend se sirve directamente en :5011."
+        return 0
+    fi
+
+    info "Configurando Nginx como reverse proxy..."
+
+    if [ -z "$domain" ]; then
+        SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+        domain="$SERVER_IP"
+    fi
+
+    # Determinar si hay SSL disponible
+    local ssl_block=""
+    if [ -n "$cert_path" ] && [ -f "$cert_path" ] && [ -n "$key_path" ] && [ -f "$key_path" ]; then
+        ssl_block="
+    listen 443 ssl;
+    ssl_certificate     $cert_path;
+    ssl_certificate_key $key_path;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+"
+    fi
+
+    $SUDO tee /etc/nginx/sites-available/cem > /dev/null << NGINX_CONF
+# =========================================================================
+# Nginx — Sistema Cementerios Municipales
+# Generado por install.sh — NO editar manualmente si usas install.sh.
+# =========================================================================
+server {
+    listen 80;
+    server_name $domain;
+    $ssl_block
+
+    # ── Proxy al frontend Next.js ─────────────────────────────────────────
+    location / {
+        proxy_pass         http://127.0.0.1:5011;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade           \$http_upgrade;
+        proxy_set_header   Connection        "upgrade";
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    # ── Las rutas /api/* van directamente al backend FastAPI ─────────────
+    # Esto asegura que no pasen por Next.js y evita el doble-proxy.
+    # Comentar este bloque si se prefiere dejar que Next.js haga el rewrite.
+    location /api/ {
+        proxy_pass         http://127.0.0.1:8001/api/;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+    }
+
+    # ── Health check del backend ──────────────────────────────────────────
+    location /health {
+        proxy_pass         http://127.0.0.1:8001/health;
+        proxy_set_header   Host              \$host;
+    }
+}
+NGINX_CONF
+
+    # Habilitar site y deshabilitar default si existe
+    $SUDO ln -sf /etc/nginx/sites-available/cem /etc/nginx/sites-enabled/cem
+    $SUDO rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+
+    if $SUDO nginx -t > /dev/null 2>&1; then
+        $SUDO systemctl reload nginx 2>/dev/null || $SUDO nginx -s reload
+        success "Nginx configurado correctamente para $domain"
+    else
+        warn "La configuración de Nginx tiene errores. Revisando..."
+        $SUDO nginx -t
+    fi
+}
+
 # ─── Ejecución del modo seleccionado ──────────────────────────────────────────
 if [ "$INSTALL_MODE" = "sqlite" ]; then
     install_sqlite_mode
@@ -495,6 +584,13 @@ elif [ "$INSTALL_MODE" = "docker" ]; then
 else
     install_native_mode
 fi
+
+# Configurar Nginx si está disponible (usa dominio/IP detectado automáticamente)
+# Para SSL, ejecutar manualmente: setup_nginx "tudominio.com" "/path/to/cert.pem" "/path/to/key.pem"
+if [ "$INSTALL_MODE" != "docker" ]; then
+    setup_nginx "" "" ""
+fi
+
 
 # ─── Resumen Final ────────────────────────────────────────────────────────────
 SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")

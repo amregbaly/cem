@@ -113,7 +113,7 @@ export default function MaestrosPage() {
   const [oSubmitting, setOSubmitting] = useState(false);
   const [oError, setOError] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
 
   const fetchData = async () => {
     setLoading(true);

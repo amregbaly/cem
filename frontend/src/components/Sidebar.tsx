@@ -63,7 +63,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     readUser();
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+    const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
     fetch(`${apiUrl}/api/v1/portal/config`)
       .then(res => res.json())
       .then(data => {

@@ -58,7 +58,7 @@ export default function DashboardPage() {
   const [certLoading, setCertLoading] = useState(false);
   const [certError, setCertError] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
 
   useEffect(() => {
     setMounted(true);
@@ -246,6 +246,22 @@ export default function DashboardPage() {
               {portalConfig.mensaje_portal}
             </p>
           </div>
+
+          <div className="shrink-0 flex items-center gap-3">
+            <Link
+              href="/admin"
+              className="inline-flex items-center space-x-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all shadow-sm border hover:shadow-md hover:opacity-90 active:scale-95"
+              style={{
+                backgroundColor: "var(--color-bg)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text)",
+              }}
+            >
+              <Lock className="w-4 h-4 text-primary" />
+              <span>{currentUser ? "Ir al Panel de Gestión" : "Acceso Funcionarios"}</span>
+              <ArrowRight className="w-3.5 h-3.5 opacity-70" />
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -432,12 +448,30 @@ export default function DashboardPage() {
       ) : (
         /* When search/list of deceased people IS enabled in the control panel */
         <div className="space-y-6">
-          {/* Autocomplete Search Hero */}
-          <div className="max-w-3xl mx-auto w-full text-center space-y-3">
-            <label className="text-xs uppercase tracking-wider font-bold text-muted-foreground block">
-              Búsqueda de Personas Sepultadas
-            </label>
-            <AutocompleteSearch />
+          {/* Autocomplete Search Card */}
+          <div
+            className="p-6 sm:p-8 rounded-3xl border shadow-sm transition-all space-y-4"
+            style={{
+              backgroundColor: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+            }}
+          >
+            <div className="flex items-center space-x-3 pb-3 border-b" style={{ borderColor: "var(--color-border)" }}>
+              <div className="p-3 rounded-2xl bg-primary/10 text-primary">
+                <Search className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold" style={{ color: "var(--color-text)" }}>
+                  Búsqueda Ciudadana de Personas Sepultadas
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Consulte sepulturas en San Carlos y Cachapoal por nombre completo o RUT.
+                </p>
+              </div>
+            </div>
+            <div className="w-full pt-1">
+              <AutocompleteSearch />
+            </div>
           </div>
 
           <div
@@ -453,7 +487,7 @@ export default function DashboardPage() {
                   <h3 className="font-bold text-base sm:text-lg" style={{ color: "var(--color-text)" }}>
                     Nómina Oficial de Sepultaciones (Habilitada en Panel de Control)
                   </h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20 whitespace-nowrap">
                     Habilitado por Administración
                   </span>
                 </div>
@@ -464,7 +498,7 @@ export default function DashboardPage() {
 
               {/* Cemetery Filter Pills */}
               <div
-                className="p-1 rounded-2xl border flex items-center self-start sm:self-center shadow-xs"
+                className="p-1 rounded-2xl border flex items-center self-start sm:self-center shadow-xs shrink-0"
                 style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
               >
                 <button
@@ -504,13 +538,13 @@ export default function DashboardPage() {
                   style={{ borderColor: "var(--color-border)" }}
                 >
                   <tr>
-                    <th className="p-4">{t("deceasedName")}</th>
-                    <th className="p-4">{t("rut")}</th>
-                    <th className="p-4">Cementerio</th>
-                    <th className="p-4">{t("location")}</th>
-                    <th className="p-4">{t("burialDate")}</th>
-                    <th className="p-4">{t("causeOfDeath")}</th>
-                    <th className="p-4 text-right">Comprobante</th>
+                    <th className="p-4 whitespace-nowrap">{t("deceasedName")}</th>
+                    <th className="p-4 whitespace-nowrap">{t("rut")}</th>
+                    <th className="p-4 whitespace-nowrap">Cementerio</th>
+                    <th className="p-4 min-w-[200px]">{t("location")}</th>
+                    <th className="p-4 whitespace-nowrap">{t("burialDate")}</th>
+                    <th className="p-4 whitespace-nowrap">{t("causeOfDeath")}</th>
+                    <th className="p-4 text-right whitespace-nowrap">Comprobante</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: "var(--color-border)" }}>
@@ -518,13 +552,13 @@ export default function DashboardPage() {
                     const isSanCarlos = burial.cementerio === "San Carlos";
                     return (
                       <tr key={burial.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                        <td className="p-4 font-bold" style={{ color: "var(--color-text)" }}>
+                        <td className="p-4 font-bold text-foreground" style={{ color: "var(--color-text)" }}>
                           {burial.nombre}
                         </td>
-                        <td className="p-4 font-mono font-medium text-muted-foreground">{burial.rut}</td>
-                        <td className="p-4">
+                        <td className="p-4 font-mono font-medium text-muted-foreground whitespace-nowrap">{burial.rut}</td>
+                        <td className="p-4 whitespace-nowrap">
                           <span
-                            className="px-2 py-0.5 rounded-full text-xs font-bold text-white shadow-xs"
+                            className="px-2.5 py-1 rounded-full text-[11px] font-bold text-white shadow-xs inline-block"
                             style={{ backgroundColor: isSanCarlos ? "var(--color-primary)" : "#059669" }}
                           >
                             {burial.cementerio}
@@ -532,22 +566,22 @@ export default function DashboardPage() {
                         </td>
                         <td className="p-4 text-xs text-muted-foreground">
                           <div className="font-semibold text-foreground">{burial.tipo}</div>
-                          <div>Sec. {burial.sector} • Fila {burial.fila} • N° {burial.numero}</div>
+                          <div className="text-[11px] text-muted-foreground/90 mt-0.5">Sec. {burial.sector} • Fila {burial.fila} • N° {burial.numero}</div>
                         </td>
-                        <td className="p-4 text-muted-foreground">{burial.fecha_sepultacion}</td>
-                        <td className="p-4">
+                        <td className="p-4 text-muted-foreground whitespace-nowrap">{burial.fecha_sepultacion}</td>
+                        <td className="p-4 whitespace-nowrap">
                           <span className="italic text-muted-foreground select-none text-xs">
                             [Confidencial • Ley 21.719]
                           </span>
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="p-4 text-right whitespace-nowrap">
                           <button
                             onClick={() => {
                               setCertFolioInput(burial.folio);
                               handleVerifyCertificate(burial.folio);
                               window.scrollTo({ top: 0, behavior: "smooth" });
                             }}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-bold hover:opacity-80 transition-all text-primary"
+                            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold hover:opacity-80 transition-all text-primary bg-primary/5 hover:bg-primary/10"
                             style={{ borderColor: "var(--color-border)" }}
                             title="Verificar Certificado Oficial"
                           >

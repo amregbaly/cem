@@ -70,7 +70,7 @@ export default function InhumacionesPage() {
   const [maskCause, setMaskCause] = useState<boolean>(true);
   const [showModal, setShowModal] = useState<boolean>(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
 
   useEffect(() => {
     setMounted(true);

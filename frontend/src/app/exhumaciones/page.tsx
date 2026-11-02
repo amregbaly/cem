@@ -108,7 +108,7 @@ export default function ExhumacionesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
 
   const fetchExhumaciones = async () => {
     setLoading(true);

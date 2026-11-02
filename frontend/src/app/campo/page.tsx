@@ -110,7 +110,7 @@ export default function ModoTerrenoPage() {
   const fetchAgenda = async () => {
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       const cemParam = cemeteryFilter ? `?cementerio_id=${cemeteryFilter}` : "";
       const res = await fetch(`${apiUrl}/api/v1/terreno/agenda${cemParam}`);
       if (!res.ok) throw new Error("Error cargando agenda de terreno");
@@ -178,7 +178,7 @@ export default function ModoTerrenoPage() {
 
   const handleCompleteTask = async (taskId: number) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       const res = await fetch(`${apiUrl}/api/v1/terreno/tarea/${taskId}/completar?operario_nombre=Sepulturero+en+Terreno&observaciones=Verificado+y+sellado`, {
         method: "PATCH"
       });
@@ -199,7 +199,7 @@ export default function ModoTerrenoPage() {
     setUploading(true);
     setUploadSuccess(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       const formData = new FormData();
       formData.append("task_id", taskId.toString());
       formData.append("tipo_documento", tipoDoc);
@@ -227,7 +227,7 @@ export default function ModoTerrenoPage() {
     setCreateSuccess(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       const res = await fetch(`${apiUrl}/api/v1/terreno/tarea`, {
         method: "POST",
         headers: {

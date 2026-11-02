@@ -220,7 +220,7 @@ export default function AdminPage() {
   // Action status message
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
 
   // Check stored token on mount
   useEffect(() => {

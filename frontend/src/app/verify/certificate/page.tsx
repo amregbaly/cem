@@ -51,7 +51,7 @@ export default function CertificatePortalPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
 
   const handleVerify = async (targetFolio: string) => {
     const clean = targetFolio.trim();

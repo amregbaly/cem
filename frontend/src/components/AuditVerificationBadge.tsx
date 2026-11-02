@@ -37,7 +37,7 @@ export default function AuditVerificationBadge() {
   const handleVerify = async () => {
     setVerifying(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       const res = await fetch(`${apiUrl}/api/v1/auditoria/verificar`);
       if (res.ok) {
         const data = await res.json();

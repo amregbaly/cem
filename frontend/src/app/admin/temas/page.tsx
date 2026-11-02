@@ -66,7 +66,7 @@ export default function AdminTemasPage() {
   const handleSaveToBackend = async () => {
     setSavedSuccess(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       await fetch(`${apiUrl}/api/v1/temas`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

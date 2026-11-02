@@ -57,7 +57,7 @@ export default function TopHeader({ onOpenMobileMenu }: TopHeaderProps) {
   };
 
   const breadcrumbs = getBreadcrumbs();
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
 
   const handleDownloadExitPackage = async () => {
     setDownloading(true);

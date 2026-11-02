@@ -84,7 +84,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
     setActionSuccess(null);
     setLoadingHistory(true);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+    const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
     fetch(`${apiUrl}/api/v1/ubicaciones/${slot.id}/historial`)
       .then(res => {
         if (!res.ok) throw new Error("Error loading history");
@@ -166,7 +166,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
     setIsEmitting(true);
     setActionSuccess(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       const payload = {
         tipo_certificado: "INHUMACION",
         cementerio_id: slot.cementerio?.includes("Cachapoal") ? 2 : 1,
@@ -199,7 +199,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
     if (!disableReason.trim()) return;
     setIsUpdatingStatus(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       const res = await fetch(`${apiUrl}/api/v1/ubicaciones/${slot.id}/deshabilitar`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -221,7 +221,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
   const handleHabilitar = async () => {
     setIsUpdatingStatus(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       const res = await fetch(`${apiUrl}/api/v1/ubicaciones/${slot.id}/habilitar`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" }

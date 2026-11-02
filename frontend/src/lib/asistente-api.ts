@@ -1,9 +1,9 @@
 /**
  * AST-07: Frontend API client for the AI assistant module.
- * All calls go through the Next.js API URL (NEXT_PUBLIC_API_URL).
+ * All calls use relative URLs proxied by Next.js rewrites / Nginx.
  */
 
-const API = process.env.NEXT_PUBLIC_API_URL || "";
+const API = "";  // always relative
 
 export interface AsistenteConfig {
   habilitado: boolean;

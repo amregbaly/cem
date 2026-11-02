@@ -73,7 +73,7 @@ export default function ArriendosPage() {
   const fetchLeases = async () => {
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       const cemParam = cemeteryFilter ? `&cementerio_id=${cemeteryFilter}` : "";
       const filterParam = diasFiltro !== null ? `&dias_filtro=${diasFiltro}` : "";
       const res = await fetch(`${apiUrl}/api/v1/arriendos/vencimientos?${cemParam}${filterParam}`);
@@ -199,7 +199,7 @@ export default function ArriendosPage() {
     setIsSending(true);
     setNotificationStatus(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
       const res = await fetch(`${apiUrl}/api/v1/arriendos/notificar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -236,7 +236,7 @@ export default function ArriendosPage() {
     );
   });
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
 
   return (
     <div className="space-y-6">
