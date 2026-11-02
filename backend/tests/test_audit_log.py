@@ -50,7 +50,36 @@ def test_audit_log_cryptographic_chain(test_db):
     assert reason is None
 
 
+def test_audit_log_database_triggers_prevent_update_and_delete(test_db):
+    # 1. Insert an audit log
+    log = AuditService.log_mutation(
+        session=test_db,
+        modulo="INHUMACIONES",
+        accion="INSERT",
+        entidad="core.tb_inhumacion",
+        registro_id="555",
+        payload_posterior={"prueba": "inmutable"},
+        username="admin",
+        commit=True
+    )
+
+    # 2. Attempting UPDATE via SQL / ORM must fail at DB trigger level
+    with pytest.raises(Exception) as exc_update:
+        log.payload_posterior = {"prueba": "hackeado"}
+        test_db.commit()
+    test_db.rollback()
+    assert "INMUTABILIDAD_ESTRICTA" in str(exc_update.value)
+
+    # 3. Attempting DELETE must fail at DB trigger level
+    with pytest.raises(Exception) as exc_delete:
+        test_db.delete(log)
+        test_db.commit()
+    test_db.rollback()
+    assert "INMUTABILIDAD_ESTRICTA" in str(exc_delete.value)
+
+
 def test_audit_log_tamper_detection(test_db):
+    from sqlalchemy import text
     # Add a log
     log = AuditService.log_mutation(
         session=test_db,
@@ -63,7 +92,8 @@ def test_audit_log_tamper_detection(test_db):
         commit=True
     )
 
-    # Tamper with the log payload directly in DB
+    # Simulate direct offline tampering on test copy by dropping trigger temporarily
+    test_db.execute(text("DROP TRIGGER IF EXISTS trg_prevent_audit_update;"))
     log.payload_posterior = {"valor": "alterado_por_atacante"}
     test_db.commit()
 
@@ -71,3 +101,4 @@ def test_audit_log_tamper_detection(test_db):
     is_valid, count, reason = AuditService.verify_chain_integrity(test_db)
     assert is_valid is False
     assert "Signature mismatch" in reason
+

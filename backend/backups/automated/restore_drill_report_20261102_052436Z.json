@@ -1,0 +1,45 @@
+{
+  "drill_id": "DRILL-20261102_052436Z",
+  "timestamp_utc": "20261102_052436Z",
+  "archive_tested": "cem_backup_daily_20261102_052435Z.tar.gz",
+  "status": "DRILL_PASSED_INTEGRITY_VERIFIED",
+  "all_hashes_matched": true,
+  "elapsed_recovery_seconds": 0.0122,
+  "rto_target_hours": 8,
+  "rto_compliant": true,
+  "integrity_results": {
+    "cem_staging.db": {
+      "status": "VALID",
+      "sha256_match": true
+    },
+    "cem_core.db": {
+      "status": "VALID",
+      "sha256_match": true
+    },
+    "cem_audit.db": {
+      "status": "VALID",
+      "sha256_match": true
+    },
+    "cem_migration.db": {
+      "status": "VALID",
+      "sha256_match": true
+    },
+    "cem_dev.db": {
+      "status": "VALID",
+      "sha256_match": true
+    }
+  },
+  "database_checks": {
+    "cem_core.db": {
+      "integrity_check": "ok",
+      "tb_ubicacion_count": 202,
+      "tb_inhumacion_count": 64,
+      "healthy": true
+    },
+    "cem_audit.db": {
+      "integrity_check": "ok",
+      "tb_log_auditoria_count": 277,
+      "healthy": true
+    }
+  }
+}

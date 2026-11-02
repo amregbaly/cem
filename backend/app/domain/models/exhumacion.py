@@ -57,5 +57,25 @@ class Exhumacion(Base, TimestampMixin):
     ubicacion_destino: Mapped[Optional["Ubicacion"]] = relationship("Ubicacion", foreign_keys=[ubicacion_destino_id], back_populates="exhumaciones_destino")
     familiar_solicitante: Mapped[Optional["Persona"]] = relationship("Persona", foreign_keys=[familiar_solicitante_id])
 
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "inhumacion_id": self.inhumacion_id,
+            "ubicacion_origen_id": self.ubicacion_origen_id,
+            "ubicacion_destino_id": self.ubicacion_destino_id,
+            "destino_externo": self.destino_externo,
+            "correlativo_memo": self.correlativo_memo,
+            "fecha_exhumacion": self.fecha_exhumacion.isoformat() if self.fecha_exhumacion else None,
+            "hora_exhumacion": self.hora_exhumacion,
+            "resolucion_numero": self.resolucion_numero,
+            "fecha_resolucion": self.fecha_resolucion.isoformat() if self.fecha_resolucion else None,
+            "familiar_solicitante_id": self.familiar_solicitante_id,
+            "motivo": self.motivo,
+            "tipo_exhumacion_id": self.tipo_exhumacion_id,
+            "libera_ubicacion_origen": self.libera_ubicacion_origen,
+            "es_reduccion": self.es_reduccion,
+            "observaciones": self.observaciones
+        }
+
     def __repr__(self) -> str:
         return f"<Exhumacion(id={self.id}, fecha='{self.fecha_exhumacion}', resolucion='{self.resolucion_numero}')>"

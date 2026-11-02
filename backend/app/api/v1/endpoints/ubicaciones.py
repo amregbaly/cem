@@ -1,9 +1,12 @@
+from datetime import date
 from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from app.infrastructure.db.session import get_db
-from app.domain.models import Ubicacion, Cementerio, Inhumacion, Derecho, Exhumacion, DerechosMaestros, Usuario, RolUsuario
+from app.domain.models import Ubicacion, Cementerio, Inhumacion, Derecho, Exhumacion, DerechosMaestros, Usuario, RolUsuario, EstadoUbicacion, Reserva
+
 from app.domain.schemas.ubicacion import UbicacionResponse, UbicacionCreate
 from app.domain.schemas.spatial import SectorSummaryResponse, MapGridResponse, MapSlotResponse
 from app.api.deps import require_role, get_current_user_optional, get_current_user
@@ -356,12 +359,30 @@ def get_ubicacion_historial(
     for exh in ubic.exhumaciones_origen:
         timeline.append({
             "tipo_evento": "EXHUMACION",
-            "titulo": f"Exhumación/Traslado desde esta sepultura",
+            "titulo": f"Exhumación/Traslado desde esta sepultura hacia {exh.ubicacion_destino.codigo_completo if exh.ubicacion_destino else (exh.destino_externo or 'Destino externo')}",
             "fecha": exh.fecha_exhumacion.isoformat() if exh.fecha_exhumacion else None,
             "folio_documento": exh.resolucion_numero,
             "detalles": {
+                "fallecido": exh.inhumacion.fallecido.nombre_completo if exh.inhumacion and exh.inhumacion.fallecido else None,
                 "motivo": exh.motivo,
                 "decreto": exh.resolucion_numero,
+                "destino": exh.ubicacion_destino.codigo_completo if exh.ubicacion_destino else exh.destino_externo,
+                "observaciones": exh.observaciones
+            }
+        })
+
+    # 2.1 Exhumations (Destino / Recepción por Traslado)
+    for exh in ubic.exhumaciones_destino:
+        timeline.append({
+            "tipo_evento": "TRASLADO_RECEPCION",
+            "titulo": f"Recepción por Traslado desde {exh.ubicacion_origen.codigo_completo}",
+            "fecha": exh.fecha_exhumacion.isoformat() if exh.fecha_exhumacion else None,
+            "folio_documento": exh.resolucion_numero,
+            "detalles": {
+                "fallecido": exh.inhumacion.fallecido.nombre_completo if exh.inhumacion and exh.inhumacion.fallecido else None,
+                "motivo": exh.motivo,
+                "decreto": exh.resolucion_numero,
+                "ubicacion_origen": exh.ubicacion_origen.codigo_completo,
                 "observaciones": exh.observaciones
             }
         })
@@ -386,6 +407,26 @@ def get_ubicacion_historial(
             }
         })
 
+        # 3.1 Ownership transfers
+        for tr in der.transferencias:
+            timeline.append({
+                "tipo_evento": "TRANSFERENCIA_DOMINIO",
+                "titulo": f"Traspaso de Dominio: {tr.titular_anterior.nombre_completo if tr.titular_anterior else 'Titular Anterior'} → {tr.titular_nuevo.nombre_completo if tr.titular_nuevo else 'Nuevo Titular'}",
+                "fecha": tr.fecha_transferencia.isoformat() if tr.fecha_transferencia else None,
+                "folio_documento": tr.numero_resolucion or tr.orden_ingreso or f"TRF-{tr.id}",
+                "detalles": {
+                    "titular_anterior": tr.titular_anterior.nombre_completo if tr.titular_anterior else None,
+                    "rut_anterior": tr.titular_anterior.rut if (tr.titular_anterior and is_staff) else "[CONFIDENCIAL LEY 21.719]",
+                    "titular_nuevo": tr.titular_nuevo.nombre_completo if tr.titular_nuevo else None,
+                    "rut_nuevo": tr.titular_nuevo.rut if (tr.titular_nuevo and is_staff) else "[CONFIDENCIAL LEY 21.719]",
+                    "numero_resolucion": tr.numero_resolucion,
+                    "orden_ingreso": tr.orden_ingreso,
+                    "documento_respaldo_url": tr.documento_respaldo_url,
+                    "motivo": tr.motivo,
+                    "observaciones": tr.observaciones
+                }
+            })
+
     # 4. Masonry works
     for m in ubic.trabajos_maestros:
         timeline.append({
@@ -397,6 +438,28 @@ def get_ubicacion_historial(
                 "tipo_trabajo": m.tipo_trabajo,
                 "maestro": m.maestro.nombre_completo if m.maestro else "No asignado",
                 "observaciones": m.observaciones
+            }
+        })
+
+    # 5. Reservations (EETT 3.11 & A2-13)
+    reservas = db.query(Reserva).filter(Reserva.ubicacion_id == ubic.id).all()
+    for res in reservas:
+        timeline.append({
+            "tipo_evento": "RESERVA",
+            "titulo": f"Reserva de Ubicación: {res.solicitante_nombre} ({res.estado})",
+            "fecha": res.fecha_reserva.isoformat() if res.fecha_reserva else None,
+            "folio_documento": f"RES-{res.id}",
+            "detalles": {
+                "solicitante": res.solicitante_nombre,
+                "rut_solicitante": res.solicitante_rut if is_staff else "[CONFIDENCIAL LEY 21.719]",
+                "telefono_solicitante": res.solicitante_telefono if is_staff else "[CONFIDENCIAL]",
+                "fecha_vencimiento": res.fecha_vencimiento.isoformat() if res.fecha_vencimiento else None,
+                "estado": res.estado,
+                "resolucion_liberacion": res.resolucion_liberacion,
+                "motivo_liberacion": res.motivo_liberacion,
+                "fecha_liberacion": res.fecha_liberacion.isoformat() if res.fecha_liberacion else None,
+                "documento_respaldo_url": res.documento_respaldo_url,
+                "observaciones": res.observaciones
             }
         })
 
@@ -419,6 +482,21 @@ def get_ubicacion_historial(
             "estado": latest_der.estado
         }
 
+    # Historical owners list across all rights and transfers
+    titulares_historicos = []
+    for der in ubic.derechos:
+        for tr in der.transferencias:
+            titulares_historicos.append({
+                "titular_anterior_id": tr.titular_anterior_id,
+                "titular_anterior_nombre": tr.titular_anterior.nombre_completo if tr.titular_anterior else None,
+                "titular_anterior_rut": tr.titular_anterior.rut if (tr.titular_anterior and is_staff) else "[CONFIDENCIAL LEY 21.719]",
+                "titular_nuevo_id": tr.titular_nuevo_id,
+                "titular_nuevo_nombre": tr.titular_nuevo.nombre_completo if tr.titular_nuevo else None,
+                "fecha_traspaso": tr.fecha_transferencia.isoformat(),
+                "documento_respaldo_url": tr.documento_respaldo_url,
+                "numero_resolucion": tr.numero_resolucion
+            })
+
     return {
         "ubicacion": {
             "id": ubic.id,
@@ -433,13 +511,17 @@ def get_ubicacion_historial(
             "color_status": ubic.color_status,
             "capacidad_total": ubic.capacidad_total,
             "capacidad_ocupada": ubic.capacidad_ocupada,
+            "activo": ubic.activo,
+            "motivo_deshabilitacion": ubic.motivo_deshabilitacion,
             "grid_x": ubic.grid_x,
             "grid_y": ubic.grid_y
         },
         "titular_actual": titular_actual,
+        "titulares_historicos": titulares_historicos,
         "timeline": timeline,
         "total_eventos": len(timeline)
     }
+
 
 
 @router.post("", response_model=UbicacionResponse, status_code=status.HTTP_201_CREATED)
@@ -479,3 +561,59 @@ def create_ubicacion(
     )
 
     return ubic
+
+
+class DeshabilitarUbicacionRequest(BaseModel):
+    motivo: str
+    observaciones: Optional[str] = None
+
+
+@router.patch("/{ubicacion_id}/deshabilitar")
+def deshabilitar_ubicacion(
+    ubicacion_id: int,
+    req: DeshabilitarUbicacionRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+):
+    """
+    Logically disables a location (EETT 3.1 & A2-01).
+    Does NOT physically delete rows. The entire history remains intact and visible.
+    Requires a mandatory justification reason.
+    """
+    ubic = db.query(Ubicacion).filter(Ubicacion.id == ubicacion_id).first()
+    if not ubic:
+        raise HTTPException(status_code=404, detail="Ubicación no encontrada.")
+
+    ubic.activo = False
+    ubic.estado = EstadoUbicacion.BLOQUEADO.value
+    ubic.motivo_deshabilitacion = req.motivo
+    if req.observaciones:
+        ubic.observaciones = f"{ubic.observaciones or ''} | [DESHABILITADO {date.today()}]: {req.observaciones}".strip(" |")
+
+    AuditService.log_mutation(
+        session=db,
+        modulo="UBICACIONES",
+        accion="DESHABILITAR_UBICACION",
+        entidad="core.tb_ubicacion",
+        registro_id=str(ubic.id),
+        payload_posterior={
+            "id": ubic.id,
+            "codigo_completo": ubic.codigo_completo,
+            "activo": False,
+            "estado": ubic.estado,
+            "motivo": req.motivo,
+            "observaciones": req.observaciones
+        },
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
+        commit=True
+    )
+
+    return {
+        "success": True,
+        "message": f"Ubicación {ubic.codigo_completo} deshabilitada correctamente. El historial se conserva intacto.",
+        "ubicacion": ubic.to_dict()
+    }
+

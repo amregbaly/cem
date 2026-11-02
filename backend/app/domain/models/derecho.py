@@ -8,6 +8,8 @@ from app.domain.models.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from app.domain.models.ubicacion import Ubicacion
     from app.domain.models.persona import Persona
+    from app.domain.models.transferencia import TransferenciaDerecho
+
 
 
 class TipoDerecho(str, enum.Enum):
@@ -59,6 +61,13 @@ class Derecho(Base, TimestampMixin):
     folio_recibo: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     estado: Mapped[str] = mapped_column(String(20), default=EstadoDerecho.VIGENTE.value, nullable=False)
 
+    # Optimistic Concurrency Control (OCC)
+    version_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    __mapper_args__ = {
+        "version_id_col": version_id
+    }
+
     # Ownership transfer lineage
     titular_anterior_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("core.tb_persona.id"), nullable=True)
     fecha_transferencia: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
@@ -75,6 +84,8 @@ class Derecho(Base, TimestampMixin):
     ubicacion: Mapped["Ubicacion"] = relationship("Ubicacion", back_populates="derechos")
     titular: Mapped["Persona"] = relationship("Persona", foreign_keys=[titular_persona_id], back_populates="derechos_titular")
     titular_anterior: Mapped[Optional["Persona"]] = relationship("Persona", foreign_keys=[titular_anterior_id])
+    transferencias: Mapped[list["TransferenciaDerecho"]] = relationship("TransferenciaDerecho", back_populates="derecho", cascade="all, delete-orphan")
+
 
     @property
     def es_perpetuo(self) -> bool:

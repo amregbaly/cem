@@ -13,7 +13,9 @@ from app.api.v1.endpoints import (
     terreno,
     maestros,
     grupos,
-    portal
+    portal,
+    exhumaciones,
+    reservas
 )
 
 api_router = APIRouter()
@@ -23,8 +25,10 @@ api_router.include_router(grupos.router, prefix="/grupos", tags=["Grupos & Permi
 api_router.include_router(portal.router, prefix="/portal", tags=["Portal Ciudadano & Configuración Pública"])
 api_router.include_router(cementerios.router, prefix="/cementerios", tags=["Cementerios"])
 api_router.include_router(ubicaciones.router, prefix="/ubicaciones", tags=["Ubicaciones & Sepulturas"])
+api_router.include_router(reservas.router, prefix="/reservas", tags=["Reservas & Disponibilidad (EETT 3.11)"])
 
 api_router.include_router(inhumaciones.router, prefix="/inhumaciones", tags=["Inhumaciones & Sepultaciones"])
+api_router.include_router(exhumaciones.router, prefix="/exhumaciones", tags=["Exhumaciones & Traslados"])
 api_router.include_router(temas.router, prefix="/temas", tags=["Gestión de Temas & Paletas"])
 api_router.include_router(auditoria.router, prefix="/auditoria", tags=["Auditoría Criptográfica HMAC"])
 api_router.include_router(busqueda.router, prefix="/busqueda", tags=["Buscador Instantáneo"])

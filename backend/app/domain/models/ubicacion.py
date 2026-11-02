@@ -51,7 +51,17 @@ class Ubicacion(Base, TimestampMixin):
     capacidad_total: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     capacidad_ocupada: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     estado: Mapped[str] = mapped_column(String(20), default=EstadoUbicacion.DISPONIBLE.value, nullable=False)
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    motivo_deshabilitacion: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     observaciones: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Optimistic Concurrency Control (OCC)
+    version_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    __mapper_args__ = {
+        "version_id_col": version_id
+    }
+
 
     # Spatial GIS coordinates (Grid & Vector Map)
     grid_x: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -107,6 +117,8 @@ class Ubicacion(Base, TimestampMixin):
             "capacidad_total": self.capacidad_total,
             "capacidad_ocupada": self.capacidad_ocupada,
             "estado": self.estado,
+            "activo": self.activo,
+            "motivo_deshabilitacion": self.motivo_deshabilitacion,
             "color_status": self.color_status,
             "grid_x": self.grid_x,
             "grid_y": self.grid_y,

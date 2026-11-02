@@ -1,0 +1,931 @@
+
+
+=== DOCUMENT PARAGRAPHS ===
+
+TECHNICAL REQUIREMENTS DOCUMENT
+
+Municipal Cemetery Management Platform – San Carlos and Cachapoal
+
+Version 1.0 | Prepared from “EETT_Cementerio_2026_2.docx” (27 pages).
+
+Purpose: convert the procurement specification into an implementation-oriented product and engineering specification for development, verification, deployment and handover.
+
+1. Document basis, scope and interpretation
+
+This document is derived from the supplied municipal technical specification. It reorganizes the source into a buildable product specification; it does not waive, replace or silently reinterpret the procurement requirements. Where the source is silent or internally ambiguous, the issue is explicitly marked for confirmation.
+
+The source describes two independently managed municipal cemeteries (San Carlos and Cachapoal), a 15-month SaaS service beginning on the signed implementation acceptance date, and a migration from the Excel export “Base de datos CEMENTERIO.xlsx” with cutoff 31-03-2026.
+
+1.1 Delivery outcomes
+
+One 100% web application, responsive and usable in current Chrome, Edge and Firefox without plugins.
+
+Independent cemetery records and configurable patios, pavilions, rows and numbering ranges.
+
+Complete historical traceability for people, properties, burials, exhumations, rentals, ownership transfers, works, payments/income references and documents.
+
+Instant bidirectional search, availability and reservation management.
+
+Templated, numbered, tamper-evident PDF certificates with QR verification.
+
+Immutable audit trail, role-based access, security controls, backup/recovery and data export.
+
+Complete, reconciled migration of the specified source workbook and documented exceptions.
+
+Operational readiness: training, manuals, support ticketing, monitoring and handover.
+
+1.2 Source constraints and commercial limits
+
+Item
+
+Source requirement
+
+Cemeteries
+
+San Carlos and Cachapoal; independent data/catalog administration.
+
+Service term
+
+15 months from signed implementation acceptance.
+
+Monthly SaaS ceiling
+
+CLP 180,000 including taxes.
+
+Implementation ceiling
+
+CLP 4,453,545 including taxes.
+
+Total ceiling
+
+CLP 7,153,545 including taxes (implementation + 15 monthly fees).
+
+Implementation period
+
+20–60 calendar days from purchase order acceptance; offer must state exact duration.
+
+Initial user counts
+
+At least 2 Administrators, 8 Administrative users, 20 read-only/visitor users; no per-user charge within these counts.
+
+Attachment storage
+
+At least 50 GB; PDF/JPG/PNG only; max 10 MB per file; malware scanning.
+
+Concurrency/performance
+
+30 concurrent users; search p95 ≤1 second; opening records and saving p95 ≤2 seconds.
+
+Availability
+
+Monthly minimum 99%; external checks every 5 minutes.
+
+2. Users, roles and access control
+
+Role
+
+Minimum accounts
+
+Permissions / restrictions
+
+Administrator
+
+2
+
+Full configuration, user and role administration, catalogs, records, reports, audit log, exports, templates, attachment rules, reservations and system settings.
+
+Administrative
+
+8
+
+Operational data entry and maintenance; no system configuration or parameter administration. Cause of death visible to this role.
+
+Visitor / read-only
+
+20
+
+Search and view burial/property information only. Must not see cause of death or contact details of responsible persons, buyers or tenants.
+
+Every account is nominative; shared accounts are prohibited.
+
+Users can change their own password. Passwords must be at least 12 characters and checked against known breached-password lists.
+
+TOTP or equivalent MFA is mandatory for Administrator and Administrative roles. MFA for Visitor users is an optional scored feature, not a baseline essential requirement.
+
+Temporarily lock account after 5 consecutive failed attempts.
+
+Automatically terminate sessions after 30 minutes of inactivity.
+
+Audit login/logout, failed login, lockout, password changes, user/permission changes and provider staff access.
+
+Enforce permissions on the server/API, not merely by hiding interface controls.
+
+3. Functional modules and requirements
+
+3.1 Cemetery and location catalog
+
+Support separate cemetery records. Each cemetery contains patios and/or pavilions. Patios have name, rows and configurable numbering ranges; pavilions have name, rows and configurable niche-number ranges. Locations include type, number, row and parent patio/pavilion. Types include underground grave (simple or waterproofed), elevated grave, vault, mausoleum, common patio grave, rented niche and perpetual niche. Catalog edits and disabling must preserve historical links; never physically delete a location referenced by history. Display lists of patios and pavilions.
+
+3.2 Property registry and complete property file
+
+Register graves, vaults and mausoleums with location, owner, purchase date, income/order number and scanned order attachment. Every property must have a complete file showing current and historical owners, all burials and exhumations, works/repairs, transfers, rentals where applicable, linked income/order numbers, observations and documents. One property can contain multiple burial records. Disabling a patio/pavilion/location must not erase history.
+
+3.3 Rental management
+
+Register rented niches with location, rental period, tenant/lessee, linked burial, income/order number and supporting documents. Configurable periods must include 2 months, 5 years, 20 years and 50 years; historical data also includes 3-year rentals and perpetual records. Register common-patio grave rentals with grave number and row and link them to a burial. Produce rental certificates. List expired and upcoming rentals at 30/60/90 days, filterable by cemetery and pavilion, showing tenant contact details to authorized roles and exportable to Excel. Administrator dashboard displays counts.
+
+3.4 Perpetual niche purchases
+
+Register perpetual remains-niche purchase: location, deceased person's name and date of death, buyer full name, RUT, address, phone, linked income/order number and image/document. Generate a purchase certificate.
+
+3.5 Burial / interment records
+
+Capture deceased full name as atomic given names, paternal surname and maternal surname; RUT with Chilean check-digit validation for new records; age; cause of death; date of birth; date of death; burial permit attachment (image/PDF); responsible person's full name, RUT, address and phone; associated income/order number and attachment; target location and observations. Link burial to a grave, vault, mausoleum, common patio grave or niche. Cause of death visible only to Administrator and Administrative roles. Imported legacy records are marked “migrated” and exempt from new-record RUT validation.
+
+3.6 Exhumations and transfers
+
+Record source location, destination location, reason/type (internal transfer, other cemetery, judicial order, cremation, etc.), deceased person, date of death, exhumation/transfer date, requester, resolution number, related income/order references, supporting documents and observations. Link every movement to the original burial record. Preserve the full movement chain; exhumed persons remain searchable with status and current location where applicable.
+
+3.7 Master/worker jobs
+
+Record paid work performed within the cemetery, including headstone installation, repair and construction. Each job has work type, date, master/worker, payment/income reference, linked property and/or niche registration number, documents and observations. Show the work in the property's history. Master/worker directory is maintained separately.
+
+3.8 Ownership transfers
+
+For graves, vaults and mausoleums, record former owner, new owner, transfer date and supporting document. Preserve all historical owners and show current owner distinctly.
+
+3.9 Attachments and observations
+
+Every record-entry area has an observations field. Administrator configures which attachment types are mandatory for each record type. Legacy migrated records are exempt from mandatory attachment rules. Accept PDF/JPG/PNG only, maximum 10 MB each; malware scan on upload; store privately and serve only to authenticated authorized users. Minimum 50 GB included.
+
+3.10 Certificates
+
+Generate templates, not manually composed documents, for grave/vault/mausoleum, rental (niche/common-patio grave), burial/interment and perpetual niche purchase. Populate deceased, property/location, income/order number and dates automatically. Include issuer/signatory name and the user who generated/printed it. Generate non-editable PDF, preferably PDF/A. Unique sequential folio per certificate type and year. Reprint retains same folio. Cancellation requires mandatory reason and audit entry. Each PDF has a QR with random non-sequential token of at least 128 bits, pointing to HTTPS verification under municipal domain. Verification page shows certificate type, folio, issue date, status (valid/cancelled) and SHA-256 PDF hash; do not expose contact details. Allow JSON or CSV export of certificate metadata. An inserted signature image is not a validation mechanism. FirmaGob advanced electronic signature is optional/scored (8 points).
+
+3.11 Availability and reservations
+
+Search by grave/niche number and show available, occupied or reserved. Include cemetery, patio/pavilion, row and number. Register reservation with applicant, expiry date and supporting document. On expiry, location returns to available only after Administrator confirmation. Define and enforce state transitions; do not mark a location available if an active burial/lease prevents it.
+
+3.12 Advanced search
+
+Indexed bidirectional search. Person search by names, either surname or RUT returns exact cemetery, patio/pavilion, row, number, linked burial income/order number, current status and movement history. Location search by grave/niche number returns every matching location (numbers may repeat across patios/cemeteries), all persons associated and their statuses. Store given names, paternal surname and maternal surname separately. Autocomplete from 3rd text character and 1st numeric/RUT digit; max 20 suggestions plus paginated “view all”. Case-, accent- and diaeresis-insensitive; ñ equivalent to n; partial match across any name word and compound surnames; RUT with/without dots/hyphen. Filters: cemetery, property type, state and death-date range. Include exhumed/transferred people with status and current location. Results update in place without full-page reload or exporting data. One click opens person/property record. Search p95 ≤1 second with full migrated data and 30 concurrent users.
+
+3.13 Reports and dashboard
+
+At minimum: burials and exhumations; occupancy/availability by patio and pavilion; certificates issued/cancelled; workers' jobs; rentals expired/upcoming; income/order references by operation type. Filter by cemetery and date range; export Excel and PDF. Administrator home dashboard includes expired/upcoming rental counts.
+
+3.14 Audit and record lifecycle
+
+Append-only audit log that neither users, Administrators nor provider staff can edit/delete. Record actor user, RUT, role, source IP, exact timestamp synchronized to official continental Chile time, module, record ID, operation, before/after values for changed fields and success/failure. Events: login/logout including failures, lockouts, password changes, user/permission changes, create/edit/logical cancellation, certificate issue/reprint/cancel, export, attachment download, configuration changes and provider staff access. Protect with cryptographic hash chaining, immutable storage or equivalent; provide integrity verification. Administrator can filter/export by user/date/module/operation. Retain throughout contract and deliver in exit package. No physical deletion of business records; logical cancellation only, mandatory reason, visible in history.
+
+3.15 Administration and configuration
+
+Manage users/roles, cemetery catalogs, location types, rental periods, certificate templates, signatory details, required-attachment rules, reservation settings and other authorized parameters. Configuration changes are audited. Preserve old values and effective dates where changes affect history.
+
+4. Core data model – recommended relational entities
+
+The following is a logical model, not a mandate for a particular ORM. Use normalized relational tables, stable primary keys, foreign keys, indexes and explicit lifecycle/status fields. Do not use location number as a globally unique key.
+
+Entity
+
+Key relationships / principal fields
+
+Cemetery
+
+id, name, code, active; parent of patios/pavilions and locations.
+
+Patio / Pavilion
+
+id, cemetery_id, name, rows/range metadata, active; preserve revisions/history.
+
+Location
+
+id, cemetery_id, patio_id or pavilion_id, type, number, row, state; unique only within its relevant scope.
+
+Person / Deceased
+
+id, given_names, paternal_surname, maternal_surname, normalized_search_name, RUT, birth/death dates, age, cause_of_death, legacy markers.
+
+ResponsibleParty / Owner / Tenant
+
+id, names, RUT, address, phone, email; role-specific relationship to transaction/property.
+
+PropertyOwnership
+
+property_id, owner_id, valid_from/to, transfer_document_id; historical ownership chain.
+
+Burial / Interment
+
+id, deceased_id, location_id, income_order_id, burial_date, permit, responsible_party_id, status, migrated flag.
+
+Movement / Exhumation
+
+id, burial_id, from_location_id, to_location_id, movement_date, reason, requester, resolution_no, income_order_id.
+
+Rental
+
+id, location_id, tenant_id, period_id, start/end, status, linked_burial_id, income_order_id.
+
+PerpetualNichePurchase
+
+id, location_id, deceased details, buyer_id, purchase_date, income_order_id.
+
+WorkOrder / MasterJob
+
+id, location_id/property_id, master_id, work_type, date, amount/income reference, attachment.
+
+IncomeOrder
+
+id, operation_type, number, date, attachment, source/legacy provenance.
+
+Attachment
+
+id, owner entity/id, storage key, original name, MIME, size, hash, scan status, uploader, timestamps.
+
+Certificate
+
+id, type, year, folio, random verification token, PDF hash, issue/cancel data, issuer, template version.
+
+Reservation
+
+id, location_id, applicant, expiry, supporting document, status, confirmation actor/time.
+
+AuditEvent
+
+append-only event, actor, IP, timestamp, entity, before/after, result, previous_hash, event_hash.
+
+User / Role / Permission
+
+nominative identity, RUT, password hash, MFA state, role, lock/session state.
+
+Catalog / Configuration
+
+rental periods, location types, work types, exhumation reasons, attachment rules, certificate templates.
+
+5. Architecture and engineering constraints
+
+100% web SaaS; single centralized production database; concurrent multi-user operation; responsive UI; Chrome/Edge/Firefox support.
+
+Cloud hosting provider must have current ISO/IEC 27001 certification. Declare provider, data and backup regions, database engine and all subcontractors with data access. Notify changes to provider/region/subcontractor 30 calendar days ahead.
+
+Municipality supplies DNS for a municipal subdomain. All traffic HTTPS; TLS 1.2 minimum (TLS 1.3 preferred), TLS/SSL 1.0/1.1 disabled, HSTS and recognized CA. Qualys SSL Labs grade A or better throughout service.
+
+Encrypt production database and attachments at rest with AES-256 or stronger. Encryption keys managed separately from data. Password hashing via Argon2id, bcrypt or equivalent.
+
+Use OWASP ASVS Level 2 (current version) as security baseline and address OWASP Top 10. Before trial, deliver application/infrastructure vulnerability scan with no open critical/high findings.
+
+Critical vulnerabilities fixed within 7 calendar days, or 72 hours if actively exploited; high within 30 calendar days. Municipality may conduct non-intrusive scans with 48 hours' notice.
+
+File access must be authorization-checked; direct public attachment URLs are forbidden. Scan uploads for malware.
+
+Concurrency: optimistic locking/version field or equivalent. If a second user edits a record already being edited/updated, warn and prevent silent overwrite; require explicit conflict resolution.
+
+Performance: p95 search ≤1 second; p95 record open/save ≤2 seconds under full dataset and 30 concurrent users. Establish reproducible load-test scenarios and report percentiles.
+
+All times use Chile continental official time for display/audit, with unambiguous storage (UTC internally plus timezone conversion recommended).
+
+6. Backup, disaster recovery and availability
+
+Control
+
+Required behavior
+
+Daily backup
+
+Automatic incremental backup every 24 hours of database and attachments.
+
+Weekly backup
+
+Full system image once per week.
+
+Encryption
+
+AES-256 or stronger; keys held separately.
+
+Off-site / immutable
+
+Automatic replication to a different region or provider; at least one immutable copy protected from modification/deletion.
+
+Retention
+
+Daily 30 days; weekly 12 weeks; monthly throughout contract.
+
+Restore drill
+
+Quarterly isolated restore; first before trial ends. Deliver evidence/date, backup used, restore duration and integrity check.
+
+RPO
+
+Maximum data loss 24 hours.
+
+Critical recovery
+
+Restore/mitigate service within Severity 1 maximum 8 hours.
+
+Availability
+
+≥99% monthly; external monitoring every 5 minutes. Exclude only scheduled maintenance notified 72h ahead, between 22:00–07:00, max 4h/month.
+
+7. Data migration
+
+Source workbook: “Base de datos CEMENTERIO.xlsx”, cutoff 31-03-2026; 18 sheets, 86,499 total rows, including 18,418 burial records and 21,716 property/purchase/rental/renewal records (40,134 principal records). Do not assume this workbook itself is attached to the current development task; the supplied file is the procurement specification.
+
+Build repeatable import pipeline: source profiling, staging tables, mapping, validation, normalization, exception report, dry-run, approval and production import. Preserve source sheet and row for every migrated record and set migrated=true.
+
+R1 RUT normalize to 12345678-K; validate DV. Invalid values remain with “RUT no validado” and exception; never discard.
+
+R2 split names into given names, paternal and maternal surnames, preserving particles (de, del, de la, San, y). Ambiguous cases go to exceptions.
+
+R3 parse Excel serial/text dates. Resolve two-digit years contextually; unparseable dates become blank with marker and original text preserved.
+
+R4 map cemetery, patio/pavilion, row and number using municipal mapping; unmatched records become exceptions.
+
+R5 detect duplicates by RUT or name + death date + location; do not auto-merge. Send to municipal decision list.
+
+R6 never invent/infer missing data; retain blank with “sin dato en origen”.
+
+R7 preserve source sheet and row; mark migrated.
+
+R8 UTF-8, retain accents/ñ, trim extra spaces. Repair ? replacing Ñ only using municipality-approved name dictionary; unresolved cases are exceptions.
+
+R9 any source field without destination mapping must be preserved in observations; no source data silently discarded.
+
+R10 retain original workbook in platform read-only.
+
+R11 treat DOB 1901-01-01, age 0 with no DOB, and dates before 1900 or after cutoff as missing/invalid according to R3/R6. Preserve NN as unidentified person.
+
+R12 tmp_exhumaciones duplicates EXHUMACIONES and must not create duplicate events. exhu_lib rows absent from EXHUMACIONES (about 998) migrate as historical exhumations after municipal validation. BUSQUEDAS and Esquema are not data imports.
+
+Deliver exception spreadsheet with sheet, row, rule and original value. Municipality resolves within 5 business days; vendor applies resolutions within 3 business days. All correction cycles included.
+
+Reconciliation per sheet: migrated + exceptions + approved justified exclusions = source rows. Municipality samples 300 random records: zero errors in location, deceased name and death date; ≤1% errors in other fields. If failed, correct and sample again.
+
+Municipality supplies workbook, catalogs, cemetery-sector mapping and missing code definitions within 3 business days after PO acceptance and NDA, via encrypted channel. Municipality delays suspend implementation timeline by same period.
+
+Migration acceptance requires signed act, reconciliation report and resolved exception report. Delete external working copies within 10 business days after approval and provide deletion certificate.
+
+8. Support, training, updates and service management
+
+Severity
+
+Response target
+
+Resolution/mitigation target
+
+Service clock
+
+S1 Critical
+
+≤2 hours
+
+≤8 hours
+
+Every day incl. holidays, 08:00–20:00; phone reporting also permitted.
+
+S2 High
+
+≤4 business hours
+
+≤2 business days
+
+Mon–Fri 08:30–17:30.
+
+S3 Medium
+
+≤1 business day
+
+≤5 business days
+
+Mon–Fri 08:30–17:30.
+
+S4 Low/query
+
+≤2 business days
+
+≤15 business days or next release
+
+Business hours.
+
+Formal ticket system accessible to Municipality, with permanent ticket history and timestamp from ticket creation; Cemetery assigns severity.
+
+Bug fixes included at no additional cost during contract.
+
+Within first 5 business days of each month, deliver prior-month availability and ticket report; prerequisite for monthly invoice approval.
+
+Security updates, bug fixes and engine versions included without extra charge; no accepted feature may be removed/degraded. Give 5 business days' notice and Spanish release notes for functional/UI changes; deploy in planned maintenance windows.
+
+At least 3 training sessions, minimum 3 hours each, before trial. At least one in-person session at San Carlos cemetery; other sessions may be remote/hybrid. Attendance records required.
+
+Provide PDF user manuals before trial and update when features change. In-app video tutorials are a scored bonus.
+
+9. Acceptance, delivery and procurement compliance
+
+The supplier must provide a 30-calendar-day trial after implementation, migration approval and training. All Annex 2 tests must pass (“Cumple”) before the signed acceptance act. One remediation window of 10 business days is allowed after written notice; persistent failures may result in cancellation without payment.
+
+Acceptance group
+
+Minimum verification
+
+Essential (E)
+
+All E tests must be demonstrated and pass; any No makes offer inadmissible.
+
+Post-award (P)
+
+All P tests must pass during the 30-day trial before acceptance.
+
+Search
+
+Name/RUT/location search, normalization, suggestions, moved/exhumed visibility, p95 latency.
+
+Certificates
+
+All types, templates, folios, QR, HTTPS verification, hash, cancellation, same folio on reprint.
+
+Audit
+
+Before/after, actor/IP/time, append-only protection and integrity verification.
+
+Security
+
+Roles, field-level restrictions, MFA, password rules, lockout, session timeout, TLS, file validation/private access.
+
+Migration
+
+Reconciliation, 300-record sample, exceptions, original workbook and provenance.
+
+Exit
+
+Generate package and import CSV/SQL into independent open-source DB; verify attachments and SHA-256 manifest.
+
+Implementation fee is invoiced in one installment after acceptance. The 15-month service term and monthly invoicing begin on that acceptance date.
+
+10. Data ownership and exit package
+
+All data entered, processed and migrated belongs exclusively to the Municipality. Administrator must be able to generate the exit package at any time. Package contents:
+
+UTF-8 CSV for each table, with headers and relational identifiers.
+
+Complete SQL backup in standard format executable on PostgreSQL or MySQL/MariaDB.
+
+All attachments in original format, organized in folders, with an index linking files to records.
+
+All issued certificates as PDFs, with folio and verification table (folio, code, hash).
+
+Complete audit log; certificate templates and system configuration (catalogs, users, roles); data dictionary and SHA-256 manifest for every file.
+
+No proprietary formats or encryption keys withheld from Municipality.
+
+Exit package within 48 business hours at contract end/early termination. Keep read-only platform and certificate verification available at no cost for 90 calendar days or until replacement is confirmed, whichever occurs first. Provide up to 10 hours transition assistance. Delete production data within 30 days after written acceptance of package and provide deletion certificate; backups expire within max 90 days.
+
+Perform exit simulations in service months 3 and 12. Defects treated as Severity 2.
+
+11. Privacy, confidentiality and incident response
+
+Supplier is data processor/encargado; use data only on municipal instructions and for service delivery. No unauthorized disclosure or subcontracting.
+
+Sign confidentiality and data-processing agreement before receiving source database.
+
+Supplier personnel access production only using named accounts and to handle a ticket; all access logged.
+
+Notify municipality of any incident affecting or potentially affecting confidentiality, integrity or availability within 2 hours of detection, by institutional email and phone.
+
+Provide incident information needed for national cybersecurity reporting within 48 hours; final root-cause and corrective-action report within 10 calendar days; preserve evidence.
+
+Support data-subject requests within 5 business days.
+
+Any international personal-data transfer must comply with Chilean laws cited in source: Law 19.628 as amended by Law 21.719. Declare data/backup regions and sub-processors.
+
+12. Procurement scoring and optional enhancements
+
+Criterion
+
+Score
+
+Advanced electronic signature through FirmaGob
+
+8
+
+Public-sector web management experience verifiable in Mercado Público: 1 contract/order
+
+4
+
+Same experience: 2 or more
+
+8 (maximum for this criterion)
+
+Severity 1 support 24×7
+
+6
+
+MFA also for Visitor/read-only role
+
+4
+
+In-platform video tutorials/help
+
+4
+
+Evaluation weights: total cost 50%, implementation period 20%, technical criteria 30%. Cost = implementation + 15 × monthly fee, taxes included. Monthly fee ceiling CLP 180,000; implementation budget CLP 4,453,545; overall ceiling CLP 7,153,545. Implementation period must be 20–60 calendar days.
+
+13. Important clarifications before production
+
+Source scope names “Cementerios Municipales de San Carlos y Cachapoal”; confirm whether Cachapoal is a separate cemetery/site under the same municipal authority and confirm its location catalog.
+
+The procurement specification mentions “Cachapoal” but the detailed examples and training location emphasize San Carlos. Confirm users, cemetery-specific signatories and branding for each.
+
+Confirm exact status transition rules for a location containing multiple burials, an active rental, an exhumed person, a reservation or a perpetual niche.
+
+Confirm whether common patio graves and all property types share one location inventory model or need distinct subtypes.
+
+Confirm whether rental renewal is a new rental transaction linked to the prior contract or an update to the existing rental; preserve full renewal history.
+
+Confirm which records require which mandatory documents, and who can waive missing attachments for exceptional new records. Migrated records are explicitly exempt.
+
+Confirm certificate folio format and whether folio sequence is global per certificate type/year or per cemetery; source says per type and year.
+
+Confirm whether issuer/signatory and printing user are separate fields and whether a digital signature is required beyond the optional FirmaGob integration.
+
+Confirm the municipality domain/DNS, certificate verification path, email/SMS channels, institutional contacts and Chile official time source.
+
+Confirm handling of data not included in the workbook, including any legacy system tables not exported (tb_autopcias, tb_nom_firma, tb_usuarios, ubicacion_pertenece). Do not invent their contents.
+
+Confirm the source workbook and municipal sector mapping are supplied separately; this uploaded procurement specification is not the actual data workbook.
+
+Confirm retention after the 15-month contract and any legal retention obligations with the Municipality.
+
+14. Definition of done
+
+All source functional requirements implemented, including all 37 Annex 2 acceptance rows.
+
+All Essential tests pass; all remaining tests pass before acceptance.
+
+Migration reconciles exactly by source sheet; no silent data loss, invented values or automatic duplicate merges.
+
+Search and record operations meet p95 targets at 30 concurrent users with full migrated data.
+
+Audit log integrity can be independently verified and no application/database admin path permits ordinary alteration or deletion.
+
+All certificates are reproducible/validatable and QR verification works on the municipal HTTPS domain.
+
+Backup, restore drill, security scan, SSL grade, monitoring and support processes evidenced.
+
+CSV/SQL/attachments/certificates/audit/configuration export can be imported and checked independently.
+
+Documentation, training attendance, data dictionary, runbooks, deployment configuration and handover materials delivered.
+
+Appendix A – Annex 2 test coverage
+
+#
+
+Class
+
+Acceptance test
+
+1
+
+E
+
+Independent cemetery/patio/pavilion setup, editable ranges and disable-with-history
+
+2
+
+P
+
+Grave/vault/mausoleum registration with owner, purchase date, order and attachment
+
+3
+
+P
+
+Niche and common-patio rental linked to burial
+
+4
+
+E
+
+New burial RUT validation and permit attachment
+
+5
+
+P
+
+Perpetual niche purchase
+
+6
+
+P
+
+Master jobs linked to income/order and property history
+
+7
+
+P
+
+Observations on every registration form
+
+8
+
+E
+
+Exhumation/transfer history including date, requester, resolution and income references
+
+9
+
+E
+
+Complete property file
+
+10
+
+P
+
+Configurable mandatory attachments and migrated-record exemption
+
+11
+
+E
+
+All certificate templates, automatic data, signatory and issuing user
+
+12
+
+E
+
+QR certificate verification, hash, random token and cancellation status
+
+13
+
+P
+
+Availability states and reservation workflow
+
+14
+
+P
+
+Rental expiry lists 30/60/90 days and Excel export
+
+15
+
+P
+
+All reports exported to Excel/PDF
+
+16
+
+P
+
+Ownership transfer and historic owners
+
+17
+
+E
+
+Append-only audit log, before/after, IP, integrity and logical cancellation
+
+18
+
+E
+
+Bidirectional person/location search
+
+19
+
+E
+
+Predictive search, accent/ñ normalization, thresholds and exhumed records
+
+20
+
+P
+
+Search and record performance targets
+
+21
+
+P
+
+One-click result to person/property with location and order number
+
+22
+
+E
+
+Role visibility restrictions and at least two Administrators
+
+23
+
+P
+
+Password length, lockout, MFA and inactivity timeout
+
+24
+
+P
+
+Training attendance and PDF manuals
+
+25
+
+P
+
+Ticket system and history
+
+26
+
+E
+
+100% web, supported browsers and responsive UI
+
+27
+
+P
+
+TLS and municipal subdomain, SSL Labs A+
+
+28
+
+P
+
+ISO 27001 cloud host and declared region
+
+29
+
+P
+
+Encryption at rest and password hash evidence
+
+30
+
+P
+
+Vulnerability scan with no open critical/high findings
+
+31
+
+P
+
+File type/size rejection and private attachment access
+
+32
+
+P
+
+Backup frequency, encryption, off-site immutable copy and retention
+
+33
+
+P
+
+First restore test before trial ends
+
+34
+
+E
+
+Exit package and independent CSV/SQL/attachment/hash validation
+
+35
+
+P
+
+Data dictionary
+
+36
+
+P
+
+Migration acceptance, reconciliation and 300-record sample
+
+37
+
+P
+
+External uptime monitoring every five minutes
+
+Appendix B – source-derived caveats
+
+The source document gives requirements and sample acceptance tests, not a complete UI design, API contract, physical database schema, exact certificate layouts, production domain, cloud provider choice or detailed status-transition matrix. Those must be designed and confirmed without weakening explicit requirements. The actual Excel source workbook and the municipal mapping/catalogs are separate inputs and must be obtained before a real migration.
+
+=== DOCUMENT TABLES ===
+
+
+--- TABLE 1 ---
+Item | Source requirement
+Cemeteries | San Carlos and Cachapoal; independent data/catalog administration.
+Service term | 15 months from signed implementation acceptance.
+Monthly SaaS ceiling | CLP 180,000 including taxes.
+Implementation ceiling | CLP 4,453,545 including taxes.
+Total ceiling | CLP 7,153,545 including taxes (implementation + 15 monthly fees).
+Implementation period | 20–60 calendar days from purchase order acceptance; offer must state exact duration.
+Initial user counts | At least 2 Administrators, 8 Administrative users, 20 read-only/visitor users; no per-user charge within these counts.
+Attachment storage | At least 50 GB; PDF/JPG/PNG only; max 10 MB per file; malware scanning.
+Concurrency/performance | 30 concurrent users; search p95 ≤1 second; opening records and saving p95 ≤2 seconds.
+Availability | Monthly minimum 99%; external checks every 5 minutes.
+
+--- TABLE 2 ---
+Role | Minimum accounts | Permissions / restrictions
+Administrator | 2 | Full configuration, user and role administration, catalogs, records, reports, audit log, exports, templates, attachment rules, reservations and system settings.
+Administrative | 8 | Operational data entry and maintenance; no system configuration or parameter administration. Cause of death visible to this role.
+Visitor / read-only | 20 | Search and view burial/property information only. Must not see cause of death or contact details of responsible persons, buyers or tenants.
+
+--- TABLE 3 ---
+Entity | Key relationships / principal fields
+Cemetery | id, name, code, active; parent of patios/pavilions and locations.
+Patio / Pavilion | id, cemetery_id, name, rows/range metadata, active; preserve revisions/history.
+Location | id, cemetery_id, patio_id or pavilion_id, type, number, row, state; unique only within its relevant scope.
+Person / Deceased | id, given_names, paternal_surname, maternal_surname, normalized_search_name, RUT, birth/death dates, age, cause_of_death, legacy markers.
+ResponsibleParty / Owner / Tenant | id, names, RUT, address, phone, email; role-specific relationship to transaction/property.
+PropertyOwnership | property_id, owner_id, valid_from/to, transfer_document_id; historical ownership chain.
+Burial / Interment | id, deceased_id, location_id, income_order_id, burial_date, permit, responsible_party_id, status, migrated flag.
+Movement / Exhumation | id, burial_id, from_location_id, to_location_id, movement_date, reason, requester, resolution_no, income_order_id.
+Rental | id, location_id, tenant_id, period_id, start/end, status, linked_burial_id, income_order_id.
+PerpetualNichePurchase | id, location_id, deceased details, buyer_id, purchase_date, income_order_id.
+WorkOrder / MasterJob | id, location_id/property_id, master_id, work_type, date, amount/income reference, attachment.
+IncomeOrder | id, operation_type, number, date, attachment, source/legacy provenance.
+Attachment | id, owner entity/id, storage key, original name, MIME, size, hash, scan status, uploader, timestamps.
+Certificate | id, type, year, folio, random verification token, PDF hash, issue/cancel data, issuer, template version.
+Reservation | id, location_id, applicant, expiry, supporting document, status, confirmation actor/time.
+AuditEvent | append-only event, actor, IP, timestamp, entity, before/after, result, previous_hash, event_hash.
+User / Role / Permission | nominative identity, RUT, password hash, MFA state, role, lock/session state.
+Catalog / Configuration | rental periods, location types, work types, exhumation reasons, attachment rules, certificate templates.
+
+--- TABLE 4 ---
+Control | Required behavior
+Daily backup | Automatic incremental backup every 24 hours of database and attachments.
+Weekly backup | Full system image once per week.
+Encryption | AES-256 or stronger; keys held separately.
+Off-site / immutable | Automatic replication to a different region or provider; at least one immutable copy protected from modification/deletion.
+Retention | Daily 30 days; weekly 12 weeks; monthly throughout contract.
+Restore drill | Quarterly isolated restore; first before trial ends. Deliver evidence/date, backup used, restore duration and integrity check.
+RPO | Maximum data loss 24 hours.
+Critical recovery | Restore/mitigate service within Severity 1 maximum 8 hours.
+Availability | ≥99% monthly; external monitoring every 5 minutes. Exclude only scheduled maintenance notified 72h ahead, between 22:00–07:00, max 4h/month.
+
+--- TABLE 5 ---
+Severity | Response target | Resolution/mitigation target | Service clock
+S1 Critical | ≤2 hours | ≤8 hours | Every day incl. holidays, 08:00–20:00; phone reporting also permitted.
+S2 High | ≤4 business hours | ≤2 business days | Mon–Fri 08:30–17:30.
+S3 Medium | ≤1 business day | ≤5 business days | Mon–Fri 08:30–17:30.
+S4 Low/query | ≤2 business days | ≤15 business days or next release | Business hours.
+
+--- TABLE 6 ---
+Acceptance group | Minimum verification
+Essential (E) | All E tests must be demonstrated and pass; any No makes offer inadmissible.
+Post-award (P) | All P tests must pass during the 30-day trial before acceptance.
+Search | Name/RUT/location search, normalization, suggestions, moved/exhumed visibility, p95 latency.
+Certificates | All types, templates, folios, QR, HTTPS verification, hash, cancellation, same folio on reprint.
+Audit | Before/after, actor/IP/time, append-only protection and integrity verification.
+Security | Roles, field-level restrictions, MFA, password rules, lockout, session timeout, TLS, file validation/private access.
+Migration | Reconciliation, 300-record sample, exceptions, original workbook and provenance.
+Exit | Generate package and import CSV/SQL into independent open-source DB; verify attachments and SHA-256 manifest.
+
+--- TABLE 7 ---
+Criterion | Score
+Advanced electronic signature through FirmaGob | 8
+Public-sector web management experience verifiable in Mercado Público: 1 contract/order | 4
+Same experience: 2 or more | 8 (maximum for this criterion)
+Severity 1 support 24×7 | 6
+MFA also for Visitor/read-only role | 4
+In-platform video tutorials/help | 4
+
+--- TABLE 8 ---
+# | Class | Acceptance test
+1 | E | Independent cemetery/patio/pavilion setup, editable ranges and disable-with-history
+2 | P | Grave/vault/mausoleum registration with owner, purchase date, order and attachment
+3 | P | Niche and common-patio rental linked to burial
+4 | E | New burial RUT validation and permit attachment
+5 | P | Perpetual niche purchase
+6 | P | Master jobs linked to income/order and property history
+7 | P | Observations on every registration form
+8 | E | Exhumation/transfer history including date, requester, resolution and income references
+9 | E | Complete property file
+10 | P | Configurable mandatory attachments and migrated-record exemption
+11 | E | All certificate templates, automatic data, signatory and issuing user
+12 | E | QR certificate verification, hash, random token and cancellation status
+13 | P | Availability states and reservation workflow
+14 | P | Rental expiry lists 30/60/90 days and Excel export
+15 | P | All reports exported to Excel/PDF
+16 | P | Ownership transfer and historic owners
+17 | E | Append-only audit log, before/after, IP, integrity and logical cancellation
+18 | E | Bidirectional person/location search
+19 | E | Predictive search, accent/ñ normalization, thresholds and exhumed records
+20 | P | Search and record performance targets
+21 | P | One-click result to person/property with location and order number
+22 | E | Role visibility restrictions and at least two Administrators
+23 | P | Password length, lockout, MFA and inactivity timeout
+24 | P | Training attendance and PDF manuals
+25 | P | Ticket system and history
+26 | E | 100% web, supported browsers and responsive UI
+27 | P | TLS and municipal subdomain, SSL Labs A+
+28 | P | ISO 27001 cloud host and declared region
+29 | P | Encryption at rest and password hash evidence
+30 | P | Vulnerability scan with no open critical/high findings
+31 | P | File type/size rejection and private attachment access
+32 | P | Backup frequency, encryption, off-site immutable copy and retention
+33 | P | First restore test before trial ends
+34 | E | Exit package and independent CSV/SQL/attachment/hash validation
+35 | P | Data dictionary
+36 | P | Migration acceptance, reconciliation and 300-record sample
+37 | P | External uptime monitoring every five minutes

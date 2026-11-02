@@ -7,6 +7,10 @@ from app.infrastructure.db.init_db import init_db
 from app.api.v1.router import api_router
 
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm.exc import StaleDataError
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize schemas and seed data
@@ -29,6 +33,28 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_STR}/redoc",
 )
 
+# Exception handler for Optimistic Concurrency Control (OCC) conflicts
+@app.exception_handler(StaleDataError)
+async def stale_data_exception_handler(request: Request, exc: StaleDataError):
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": "CONFLICTO_CONCURRENCIA: El registro fue modificado o eliminado por otra sesión concurrente. Por favor recargue los datos para resolver las diferencias antes de guardar."
+        }
+    )
+
+# Security headers middleware (OWASP ASVS Level 2, EETT P54)
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
 # CORS middleware for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
@@ -39,6 +65,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
 
 
 @app.get("/health")

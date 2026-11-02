@@ -64,6 +64,86 @@ def init_db(db: Session) -> None:
             except Exception:
                 pass
 
+        # Ensure OCC and deshabilitación columns on core.tb_ubicacion
+        for col, col_type in [("version_id", "INTEGER DEFAULT 1"), ("activo", "BOOLEAN DEFAULT 1"), ("motivo_deshabilitacion", "TEXT")]:
+            try:
+                if "postgresql" in str(bind.url):
+                    conn.execute(text(f"ALTER TABLE core.tb_ubicacion ADD COLUMN IF NOT EXISTS {col} {col_type};"))
+                else:
+                    conn.execute(text(f"ALTER TABLE core.tb_ubicacion ADD COLUMN {col} {col_type};"))
+                conn.commit()
+            except Exception:
+                pass
+
+        # Ensure OCC column on core.tb_derecho
+        try:
+            if "postgresql" in str(bind.url):
+                conn.execute(text("ALTER TABLE core.tb_derecho ADD COLUMN IF NOT EXISTS version_id INTEGER DEFAULT 1;"))
+            else:
+                conn.execute(text("ALTER TABLE core.tb_derecho ADD COLUMN version_id INTEGER DEFAULT 1;"))
+            conn.commit()
+        except Exception:
+            pass
+
+        # Ensure OCC and responsable columns on core.tb_inhumacion
+        for col, col_type in [
+            ("version_id", "INTEGER DEFAULT 1"),
+            ("responsable_nombre", "VARCHAR(150)"),
+            ("responsable_rut", "VARCHAR(15)"),
+            ("responsable_telefono", "VARCHAR(30)"),
+            ("responsable_direccion", "VARCHAR(200)"),
+            ("orden_ingreso_doc_url", "VARCHAR(255)")
+        ]:
+            try:
+                if "postgresql" in str(bind.url):
+                    conn.execute(text(f"ALTER TABLE core.tb_inhumacion ADD COLUMN IF NOT EXISTS {col} {col_type};"))
+                else:
+                    conn.execute(text(f"ALTER TABLE core.tb_inhumacion ADD COLUMN {col} {col_type};"))
+                conn.commit()
+            except Exception:
+                pass
+
+
+        # Strict Immutability Triggers for tb_log_auditoria
+        try:
+            if "postgresql" in str(bind.url):
+                conn.execute(text("""
+                    CREATE OR REPLACE FUNCTION audit.prevent_audit_tampering()
+                    RETURNS TRIGGER AS $$
+                    BEGIN
+                        RAISE EXCEPTION 'INMUTABILIDAD_ESTRICTA: La tabla de auditoría audit.tb_log_auditoria es append-only. Modificaciones o eliminaciones prohibidas.';
+                    END;
+                    $$ LANGUAGE plpgsql;
+
+                    DROP TRIGGER IF EXISTS trg_prevent_audit_update ON audit.tb_log_auditoria;
+                    CREATE TRIGGER trg_prevent_audit_update
+                    BEFORE UPDATE ON audit.tb_log_auditoria
+                    FOR EACH ROW EXECUTE FUNCTION audit.prevent_audit_tampering();
+
+                    DROP TRIGGER IF EXISTS trg_prevent_audit_delete ON audit.tb_log_auditoria;
+                    CREATE TRIGGER trg_prevent_audit_delete
+                    BEFORE DELETE ON audit.tb_log_auditoria
+                    FOR EACH ROW EXECUTE FUNCTION audit.prevent_audit_tampering();
+                """))
+            else:
+                conn.execute(text("""
+                    CREATE TRIGGER IF NOT EXISTS trg_prevent_audit_update
+                    BEFORE UPDATE ON tb_log_auditoria
+                    BEGIN
+                        SELECT RAISE(ABORT, 'INMUTABILIDAD_ESTRICTA: La tabla de auditoría es append-only. Operación UPDATE prohibida.');
+                    END;
+                """))
+                conn.execute(text("""
+                    CREATE TRIGGER IF NOT EXISTS trg_prevent_audit_delete
+                    BEFORE DELETE ON tb_log_auditoria
+                    BEGIN
+                        SELECT RAISE(ABORT, 'INMUTABILIDAD_ESTRICTA: La tabla de auditoría es append-only. Operación DELETE prohibida.');
+                    END;
+                """))
+            conn.commit()
+        except Exception:
+            pass
+
     # 3. Seed Cemeteries
     cem_sc = db.query(Cementerio).filter_by(codigo="SAN_CARLOS").first()
     if not cem_sc:

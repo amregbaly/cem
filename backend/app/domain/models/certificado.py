@@ -70,6 +70,9 @@ class Certificado(Base, TimestampMixin):
     sha256_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     codigo_qr_base64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     url_pdf: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    pdf_bytes: Mapped[Optional[bytes]] = mapped_column(Text().with_variant(String, "sqlite"), nullable=True)  # Base64 or bytes
+    motivo_cancelacion: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    fecha_cancelacion: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     observaciones: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
@@ -80,27 +83,20 @@ class Certificado(Base, TimestampMixin):
 
     def to_public_dict(self) -> dict:
         """
-        Public verification representation.
-        Strictly excludes cause of death and private contact details (Ley 21.719).
+        Public verification representation (EETT 3.10 & Annex 2 Row 12 / A2-12).
+        Strictly exposes ONLY: type, folio, issue date, status, SHA-256.
+        Prevents leaking personal or medical data to the public (Ley 21.719).
         """
         return {
             "folio": self.folio,
             "token_verificacion": self.token_verificacion,
             "tipo_certificado": self.tipo_certificado,
             "estado": self.estado,
-            "es_valido": self.estado == EstadoCertificado.VIGENTE.value,
-            "cementerio": self.cementerio.nombre if self.cementerio else "Cementerio Municipal",
-            "codigo_ubicacion": self.codigo_ubicacion or (self.ubicacion.codigo_completo if self.ubicacion else "N/A"),
-            "fallecido_nombre": self.fallecido_nombre,
-            "rut_fallecido": self.rut_fallecido,
-            "titular_nombre": self.titular_nombre,
-            "rut_titular": self.rut_titular,
-            "autoridad_emisora": self.autoridad_emisora,
-            "funcionario_emisor": self.funcionario_emisor,
+            "es_valido": self.estado == "VIGENTE",
             "fecha_emision": self.fecha_emision.isoformat() if self.fecha_emision else None,
-            "fecha_vencimiento": self.fecha_vencimiento.isoformat() if self.fecha_vencimiento else None,
             "sha256_hash": self.sha256_hash,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "motivo_cancelacion": self.motivo_cancelacion if self.estado == "CANCELADO" else None,
+            "cementerio": self.cementerio.nombre if self.cementerio else "Cementerio Municipal"
         }
 
     def __repr__(self) -> str:

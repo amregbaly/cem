@@ -160,35 +160,123 @@ def completar_tarea_terreno(
     }
 
 
+from fastapi.responses import FileResponse
+
+MAGIC_HEADERS = {
+    ".pdf": b"%PDF-",
+    ".png": b"\x89PNG\r\n\x1a\n",
+    ".jpg": b"\xff\xd8\xff",
+    ".jpeg": b"\xff\xd8\xff",
+}
+
+BLOCKED_EXECUTABLE_PREFIXES = [
+    b"MZ",       # Windows DOS/PE executable / DLL
+    b"\x7fELF",   # Linux ELF binary
+    b"PK\x03\x04" # Disguised ZIP / APK / JAR executable payload
+]
+
+
 @router.post("/subir-acta")
 async def subir_acta_o_foto(
     task_id: int = Form(...),
     tipo_adjunto: str = Form("FOTO_PASE"),  # FOTO_PASE or ACTA_FIRMADA
-    archivo: UploadFile = File(...)
+    archivo: UploadFile = File(...),
+    current_user: Usuario = Depends(get_current_user)
 ):
     """
-    Upload endpoint for burial permits, death certificates, or signed field acts (PDF/JPG/PNG up to 10MB).
+    Upload endpoint for burial permits, death certificates, or signed field acts.
+    Enforces strict 10MB limit, allowlist extension, binary magic-bytes signature verification,
+    and executable/malware payload rejection (OWASP ASVS & EETT P54).
     """
-    # Max size check: 10MB
+    # 1. Size verification: 10MB limit
     contents = await archivo.read()
     if len(contents) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="El archivo excede el límite permitido de 10 MB.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo excede el límite permitido de 10 MB."
+        )
 
+    # 2. Extension verification
     allowed_exts = {".pdf", ".jpg", ".jpeg", ".png"}
     ext = os.path.splitext(archivo.filename or "archivo.jpg")[1].lower()
     if ext not in allowed_exts:
-        raise HTTPException(status_code=400, detail="Formato de archivo no válido. Se admiten PDF, JPG y PNG.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Formato de archivo no válido. Se admiten exclusivamente PDF, JPG y PNG."
+        )
 
-    safe_filename = f"task_{task_id}_{uuid.uuid4().hex[:8]}{ext}"
+    # 3. Executable / malware signature detection
+    for blocked_prefix in BLOCKED_EXECUTABLE_PREFIXES:
+        if contents.startswith(blocked_prefix):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Seguridad: Contenido binario ejecutable o comprimido rechazado por política de seguridad."
+            )
+
+    # 4. Strict Magic-Bytes Signature Verification
+    expected_header = MAGIC_HEADERS.get(ext)
+    if expected_header and not contents.startswith(expected_header):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Inconsistencia de archivo: El contenido binario no coincide con la extensión declarada {ext} (firma inválida)."
+        )
+
+    # 5. Secure random file naming (prevent directory traversal / overwrites)
+    safe_filename = f"task_{task_id}_{uuid.uuid4().hex[:12]}{ext}"
     target_path = os.path.join(UPLOAD_DIR, safe_filename)
     with open(target_path, "wb") as f:
         f.write(contents)
 
-    file_url = f"/uploads/{safe_filename}"
+    private_url = f"/api/v1/terreno/adjuntos/{safe_filename}"
     return {
         "success": True,
         "filename": safe_filename,
-        "url": file_url,
+        "url": private_url,
         "size_bytes": len(contents),
         "content_type": archivo.content_type
     }
+
+
+@router.get("/adjuntos/{filename}")
+def descargar_adjunto_privado(
+    filename: str,
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Authenticated Private Document Download Handler.
+    Restricts download to authenticated staff. Visitor profile is rejected with 403 Forbidden.
+    Prevents public object storage exposure and directory traversal (EETT P54, ASVS Level 2).
+    """
+    # 1. Role-based authorization: Visitor cannot download internal attachments
+    if current_user.rol == RolUsuario.VISITA.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso restringido: El perfil Visita no cuenta con autorización para descargar documentación interna protegida por Ley 21.719."
+        )
+
+    # 2. Directory traversal sanitization
+    clean_filename = os.path.basename(filename)
+    file_path = os.path.join(UPLOAD_DIR, clean_filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El archivo adjunto solicitado no existe en el almacenamiento privado."
+        )
+
+    ext = os.path.splitext(clean_filename)[1].lower()
+    media_types = {
+        ".pdf": "application/pdf",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg"
+    }
+    media_type = media_types.get(ext, "application/octet-stream")
+
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        filename=clean_filename,
+        headers={"Content-Disposition": f'attachment; filename="{clean_filename}"'}
+    )
+

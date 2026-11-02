@@ -18,12 +18,40 @@ engine = create_engine(
 if "sqlite" in settings.DATABASE_URL:
     @event.listens_for(engine, "connect")
     def do_connect(dbapi_connection, connection_record):
+        def unaccent_py(val):
+            if not val:
+                return ""
+            import unicodedata
+            nfkd = unicodedata.normalize('NFKD', str(val))
+            clean = "".join(c for c in nfkd if not unicodedata.combining(c))
+            return clean.lower().replace("ñ", "n")
+
+        dbapi_connection.create_function("unaccent_sql", 1, unaccent_py)
+
         cursor = dbapi_connection.cursor()
         cursor.execute("ATTACH DATABASE 'cem_core.db' AS core")
         cursor.execute("ATTACH DATABASE 'cem_staging.db' AS staging")
         cursor.execute("ATTACH DATABASE 'cem_migration.db' AS migration")
         cursor.execute("ATTACH DATABASE 'cem_audit.db' AS audit")
+        try:
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS audit.trg_prevent_audit_update
+                BEFORE UPDATE ON tb_log_auditoria
+                BEGIN
+                    SELECT RAISE(ABORT, 'INMUTABILIDAD_ESTRICTA: La tabla de auditoría es append-only. Operación UPDATE prohibida.');
+                END;
+            """)
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS audit.trg_prevent_audit_delete
+                BEFORE DELETE ON tb_log_auditoria
+                BEGIN
+                    SELECT RAISE(ABORT, 'INMUTABILIDAD_ESTRICTA: La tabla de auditoría es append-only. Operación DELETE prohibida.');
+                END;
+            """)
+        except Exception:
+            pass
         cursor.close()
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

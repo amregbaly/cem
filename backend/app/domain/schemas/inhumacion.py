@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import date
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class InhumacionCreate(BaseModel):
@@ -14,6 +14,12 @@ class InhumacionCreate(BaseModel):
     fecha_sepultacion: date
     causa_fallecimiento: Optional[str] = None
     pase_sepultacion_folio: Optional[str] = None
+    pase_sepultacion_doc_url: Optional[str] = None
+    responsable_nombre: Optional[str] = None
+    responsable_rut: Optional[str] = None
+    responsable_telefono: Optional[str] = None
+    responsable_direccion: Optional[str] = None
+    orden_ingreso_doc_url: Optional[str] = None
     observaciones: Optional[str] = None
 
 
@@ -25,9 +31,15 @@ class InhumacionResponse(BaseModel):
     rut_fallecido: Optional[str] = None
     fecha_defuncion: Optional[date] = None
     fecha_sepultacion: date
-    causa_fallecimiento: Optional[str] = None  # Masked if visitor role
+    causa_fallecimiento: Optional[str] = None  # Masked if visitor role (Ley 20.584)
     ubicacion_codigo: Optional[str] = None
     pase_sepultacion_folio: Optional[str] = None
+    pase_sepultacion_doc_url: Optional[str] = None
+    responsable_nombre: Optional[str] = None
+    responsable_rut: Optional[str] = None
+    responsable_telefono: Optional[str] = None  # Masked if visitor role (Ley 21.719)
+    responsable_direccion: Optional[str] = None  # Masked if visitor role (Ley 21.719)
+    orden_ingreso_doc_url: Optional[str] = None
+    observaciones: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

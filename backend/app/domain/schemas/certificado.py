@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class CertificadoEmitirRequest(BaseModel):
-    tipo_certificado: str  # INHUMACION, PROPIEDAD, RENOVACION, EXHUMACION
+    tipo_certificado: str  # INHUMACION, PROPIEDAD, ARRIENDO, PERPETUO, EXHUMACION
     cementerio_id: int
     ubicacion_id: Optional[int] = None
     inhumacion_id: Optional[int] = None
@@ -15,6 +15,11 @@ class CertificadoEmitirRequest(BaseModel):
     observaciones: Optional[str] = None
 
 
+class CertificadoAnularRequest(BaseModel):
+    motivo: str
+    observaciones: Optional[str] = None
+
+
 class CertificadoPublicoResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -23,15 +28,7 @@ class CertificadoPublicoResponse(BaseModel):
     tipo_certificado: str
     estado: str
     es_valido: bool
-    cementerio: str
-    codigo_ubicacion: str
-    fallecido_nombre: Optional[str] = None
-    rut_fallecido: Optional[str] = None
-    titular_nombre: Optional[str] = None
-    rut_titular: Optional[str] = None
-    autoridad_emisora: str
-    funcionario_emisor: str
     fecha_emision: Optional[str] = None
-    fecha_vencimiento: Optional[str] = None
     sha256_hash: str
-    created_at: Optional[str] = None
+    motivo_cancelacion: Optional[str] = None
+    cementerio: Optional[str] = None

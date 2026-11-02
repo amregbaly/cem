@@ -77,13 +77,14 @@ def test_certificados_flow():
     assert res_pdf.headers["content-type"] == "application/pdf"
     assert len(res_pdf.content) > 500
 
-    # Public verification (Ley 21.719 compliant)
+    # Public verification (Ley 21.719 / EETT Section 6/8 compliant: only type, folio, date, status, hash)
     res_pub = client.get(f"/api/v1/certificados/publico/{folio}")
     assert res_pub.status_code == 200
     pub_data = res_pub.json()
     assert pub_data["folio"] == folio
     assert pub_data["estado"] == "VIGENTE"
-    assert "fallecido_nombre" in pub_data
+    assert "sha256_hash" in pub_data
+    assert "fallecido_nombre" not in pub_data
     # Verify no medical diagnosis leaked
     assert "diagnostico" not in pub_data
     assert "causa_muerte" not in pub_data
@@ -102,8 +103,20 @@ def test_arriendos_vencimientos_and_export():
     assert b"Folio" in res_csv.content or b"Titular" in res_csv.content
 
 def test_terreno_agenda_and_tasks():
+    from datetime import date
+    today_str = date.today().isoformat()
+    # Ensure at least one task exists for today
+    client.post("/api/v1/terreno/tarea", json={
+        "folio_orden": f"ORD-TEST-{today_str}",
+        "cementerio_id": 1,
+        "tipo_tarea": "INHUMACION",
+        "fallecido_nombre": "TEST PERSONA TERRENO",
+        "fecha_programada": today_str,
+        "hora_programada": "10:00",
+        "sepulturero_asignado": "Operador Test"
+    })
     # Get daily agenda
-    res = client.get("/api/v1/terreno/agenda?cementerio_id=1")
+    res = client.get(f"/api/v1/terreno/agenda?cementerio_id=1&fecha={today_str}")
     assert res.status_code == 200
     agenda = res.json()
     assert isinstance(agenda, list)
@@ -115,3 +128,4 @@ def test_terreno_agenda_and_tasks():
     assert res_comp.status_code == 200
     updated = res_comp.json()
     assert updated["tarea"]["estado"] == "COMPLETADA"
+

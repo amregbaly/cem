@@ -9,6 +9,8 @@ class UbicacionBase(BaseModel):
     fila: str
     numero: str
     capacidad_total: int = 1
+    activo: bool = True
+    motivo_deshabilitacion: Optional[str] = None
     observaciones: Optional[str] = None
 
 
@@ -20,6 +22,8 @@ class UbicacionResponse(UbicacionBase):
     id: int
     capacidad_ocupada: int
     estado: str
+    activo: bool = True
+    motivo_deshabilitacion: Optional[str] = None
     color_status: Optional[str] = None
     grid_x: Optional[int] = None
     grid_y: Optional[int] = None

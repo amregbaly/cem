@@ -1,0 +1,36 @@
+{
+  "status": "SUCCESS",
+  "backup_file": "/home/amr/dev/cem2/backend/backups/automated/cem_backup_daily_20261102_050333Z.tar.gz",
+  "size_bytes": 247168,
+  "sha256_archive": "92ea33ebf933ebbb788cccecba4c701734410ab99c12241da650394382d4c4b5",
+  "manifest": {
+    "backup_id": "cem_backup_daily_20261102_050333Z",
+    "backup_type": "daily",
+    "timestamp_utc": "20261102_050333Z",
+    "rpo_guarantee_hours": 24,
+    "encryption_algorithm": "AES-256-GCM",
+    "retention_policy": "30_DAYS",
+    "files": {
+      "cem_staging.db": {
+        "size_bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "cem_core.db": {
+        "size_bytes": 782336,
+        "sha256": "6da06adb23398a9739d53e651f7721d54ab4f5dc2b40def729e8d7faff1dba5d"
+      },
+      "cem_audit.db": {
+        "size_bytes": 204800,
+        "sha256": "b85e770d649028a65ec343446cf4942a6e4779f901a2e05309c5e46f1289d38b"
+      },
+      "cem_migration.db": {
+        "size_bytes": 45056,
+        "sha256": "6cc252fae7800789916793c57426b9d19a9d2836a537649f12c28ca4c9d72b2d"
+      },
+      "cem_dev.db": {
+        "size_bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  }
+}

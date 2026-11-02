@@ -25,7 +25,7 @@ def list_inhumaciones(
     """
     List burials. 
     If visitor (unauthenticated), access is governed by portal configuration (admin toggle).
-    Cause of death is masked for visitor/public profiles.
+    Cause of death (Ley 20.584) and contact info of responsible party (Ley 21.719) are masked for visitor/public.
     """
     is_staff = user and user.rol in {RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value}
     if not is_staff:
@@ -61,11 +61,63 @@ def list_inhumaciones(
             rut_fallecido=inh.fallecido.rut,
             fecha_defuncion=inh.fecha_defuncion,
             fecha_sepultacion=inh.fecha_sepultacion,
-            causa_fallecimiento=inh.causa_fallecimiento if is_staff else "[CONFIDENCIAL]",
+            causa_fallecimiento=inh.causa_fallecimiento if is_staff else "[CONFIDENCIAL LEY 20.584]",
             ubicacion_codigo=inh.ubicacion.codigo_completo,
-            pase_sepultacion_folio=inh.pase_sepultacion_folio
+            pase_sepultacion_folio=inh.pase_sepultacion_folio,
+            pase_sepultacion_doc_url=inh.pase_sepultacion_doc_url,
+            responsable_nombre=inh.responsable_nombre,
+            responsable_rut=inh.responsable_rut,
+            responsable_telefono=inh.responsable_telefono if is_staff else "[PROTEGIDO LEY 21.719]",
+            responsable_direccion=inh.responsable_direccion if is_staff else "[PROTEGIDO LEY 21.719]",
+            orden_ingreso_doc_url=inh.orden_ingreso_doc_url,
+            observaciones=inh.observaciones
         ))
     return response
+
+
+@router.get("/{id}", response_model=InhumacionResponse)
+def get_inhumacion(
+    id: int,
+    db: Session = Depends(get_db),
+    user: Optional[Usuario] = Depends(get_current_user_optional)
+):
+    """
+    Get detailed burial dossier.
+    Enforces privacy masking for Visitor roles.
+    """
+    inh = db.query(Inhumacion).filter(Inhumacion.id == id).first()
+    if not inh:
+        raise HTTPException(status_code=404, detail="Inhumación no encontrada.")
+
+    is_staff = user and user.rol in {RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value}
+    if not is_staff:
+        portal_cfg = db.query(ConfigPortal).first()
+        permitir = portal_cfg.permitir_lista_fallecidos if portal_cfg else False
+        if not permitir:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso confidencial restringido."
+            )
+
+    return InhumacionResponse(
+        id=inh.id,
+        ubicacion_id=inh.ubicacion_id,
+        numero_ingreso=inh.numero_ingreso,
+        nombre_fallecido=inh.fallecido.nombre_completo,
+        rut_fallecido=inh.fallecido.rut,
+        fecha_defuncion=inh.fecha_defuncion,
+        fecha_sepultacion=inh.fecha_sepultacion,
+        causa_fallecimiento=inh.causa_fallecimiento if is_staff else "[CONFIDENCIAL LEY 20.584]",
+        ubicacion_codigo=inh.ubicacion.codigo_completo,
+        pase_sepultacion_folio=inh.pase_sepultacion_folio,
+        pase_sepultacion_doc_url=inh.pase_sepultacion_doc_url,
+        responsable_nombre=inh.responsable_nombre,
+        responsable_rut=inh.responsable_rut,
+        responsable_telefono=inh.responsable_telefono if is_staff else "[PROTEGIDO LEY 21.719]",
+        responsable_direccion=inh.responsable_direccion if is_staff else "[PROTEGIDO LEY 21.719]",
+        orden_ingreso_doc_url=inh.orden_ingreso_doc_url,
+        observaciones=inh.observaciones
+    )
 
 
 @router.post("", response_model=InhumacionResponse, status_code=status.HTTP_201_CREATED)
@@ -75,11 +127,12 @@ def create_inhumacion(
     current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
 ):
     """
-    Register a new burial.
+    Register a new burial (EETT 3.5 & Annex 2 Row 4 / A2-04).
     Validates:
     - Location exists and has capacity.
     - Burial date >= Death date.
-    - Deceased RUT with Modulo 11 validation.
+    - Deceased RUT with Modulo 11 validation (Chilean standards).
+    - Responsible person details (Full name, RUT, phone, address, income order doc).
     """
     ubic = db.query(Ubicacion).filter(Ubicacion.id == inh_in.ubicacion_id).first()
     if not ubic:
@@ -98,13 +151,20 @@ def create_inhumacion(
             detail="La fecha de sepultación debe ser igual o posterior a la fecha de defunción."
         )
 
-    # RUT validation
+    # RUT validation for deceased
     is_valid_rut, formatted_rut, cuerpo_num, dv_str = validate_and_format_rut(inh_in.rut)
     if inh_in.rut and not is_valid_rut:
         raise HTTPException(
             status_code=400,
             detail=f"RUT ingresado '{inh_in.rut}' no cumple con el algoritmo Módulo 11 chileno."
         )
+
+    # Responsible RUT validation if supplied
+    resp_rut_formatted = inh_in.responsable_rut
+    if inh_in.responsable_rut:
+        r_valid, r_fmt, _, _ = validate_and_format_rut(inh_in.responsable_rut)
+        if r_valid:
+            resp_rut_formatted = r_fmt
 
     # Person resolution or creation
     name_info = parse_chilean_name(inh_in.nombres, inh_in.apellido_paterno, inh_in.apellido_materno)
@@ -130,6 +190,12 @@ def create_inhumacion(
         fecha_sepultacion=inh_in.fecha_sepultacion,
         causa_fallecimiento=inh_in.causa_fallecimiento,
         pase_sepultacion_folio=inh_in.pase_sepultacion_folio,
+        pase_sepultacion_doc_url=inh_in.pase_sepultacion_doc_url,
+        responsable_nombre=inh_in.responsable_nombre,
+        responsable_rut=resp_rut_formatted,
+        responsable_telefono=inh_in.responsable_telefono,
+        responsable_direccion=inh_in.responsable_direccion,
+        orden_ingreso_doc_url=inh_in.orden_ingreso_doc_url,
         observaciones=inh_in.observaciones
     )
     db.add(inh)
@@ -166,5 +232,12 @@ def create_inhumacion(
         fecha_sepultacion=inh.fecha_sepultacion,
         causa_fallecimiento=inh.causa_fallecimiento,
         ubicacion_codigo=ubic.codigo_completo,
-        pase_sepultacion_folio=inh.pase_sepultacion_folio
+        pase_sepultacion_folio=inh.pase_sepultacion_folio,
+        pase_sepultacion_doc_url=inh.pase_sepultacion_doc_url,
+        responsable_nombre=inh.responsable_nombre,
+        responsable_rut=inh.responsable_rut,
+        responsable_telefono=inh.responsable_telefono,
+        responsable_direccion=inh.responsable_direccion,
+        orden_ingreso_doc_url=inh.orden_ingreso_doc_url,
+        observaciones=inh.observaciones
     )
