@@ -246,15 +246,6 @@ export default function DashboardPage() {
               {portalConfig.mensaje_portal}
             </p>
           </div>
-
-          <Link
-            href="/admin"
-            className="inline-flex items-center justify-center space-x-2 px-5 py-2.5 rounded-2xl text-xs font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5 self-start md:self-center shrink-0"
-            style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
-          >
-            <Lock className="w-3.5 h-3.5 text-primary" />
-            <span>{currentUser ? "Panel de Administración" : "Acceso Funcionarios"}</span>
-          </Link>
         </div>
       </div>
 
@@ -436,15 +427,6 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-
-            <Link
-              href="/admin"
-              className="flex items-center space-x-2 px-5 py-2.5 rounded-2xl text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-95 shrink-0"
-              style={{ backgroundColor: "var(--color-primary)" }}
-            >
-              <span>{currentUser ? "Configurar en Panel" : "Acceso Funcionarios"}</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
           </div>
         </div>
       ) : (

@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = Field(default="cementerio-documentos")
     S3_REGION: str = Field(default="us-east-1")
 
+    # Verification Portal URL for PDF QR codes
+    VERIFY_BASE_URL: str = Field(default="https://munisancarlosdemo.voxera.net/verify/certificate")
+
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = Field(
         default=["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000"]

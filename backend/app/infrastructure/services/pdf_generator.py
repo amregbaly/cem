@@ -10,6 +10,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+from app.core.config import settings
 
 
 def get_logo_path() -> Optional[str]:
@@ -41,7 +42,7 @@ def generate_certificate_pdf(
     autoridad_emisora: str = "Dirección de Cementerios Municipales de San Carlos y Cachapoal",
     funcionario_emisor: str = "Encargado de Registros Municipales",
     observaciones: Optional[str] = None,
-    verify_base_url: str = "http://localhost:5011/verify/certificate"
+    verify_base_url: Optional[str] = None
 ) -> Tuple[bytes, str, str]:
     """
     Generates a formal municipal PDF certificate with embedded QR code.
@@ -50,7 +51,8 @@ def generate_certificate_pdf(
     Complies with Ley 21.719 and Chilean Municipal EETT standards.
     """
     emision_date = fecha_emision or date.today()
-    verify_url = f"{verify_base_url}/{folio}"
+    base_url = (verify_base_url or getattr(settings, "VERIFY_BASE_URL", "https://munisancarlosdemo.voxera.net/verify/certificate")).rstrip("/")
+    verify_url = f"{base_url}/{folio}"
 
     # 1. Generate QR Code in memory
     qr = qrcode.QRCode(
