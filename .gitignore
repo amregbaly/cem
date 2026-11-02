@@ -65,9 +65,6 @@ frontend/.env.production.local
 # ==========================================
 # Local databases, dumps & automated backups
 # ==========================================
-*.db
-*.sqlite
-*.sqlite3
 postgres_data/
 backups/
 backend/backups/automated/
