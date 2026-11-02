@@ -54,3 +54,5 @@ postgres_data/
 .DS_Store
 Thumbs.db
 *.db
+backend/backups/automated/
+*.tsbuildinfo

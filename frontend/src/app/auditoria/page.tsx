@@ -49,9 +49,9 @@ const INITIAL_LOGS: AuditEntry[] = [
     modulo: "INHUMACIONES",
     accion: "REGISTRAR_INHUMACION",
     entidad_tipo: "tb_inhumacion",
-    entidad_id: "INH-2026-00142",
+    entidad_id: "ING-623302025",
     datos_anteriores: null,
-    datos_nuevos: JSON.stringify({ fallecido: "MANUEL JESUS MUÑOZ SEPULVEDA", rut: "7842119-4", sepultura: "PAB-B-F03-142", cementerio: "San Carlos" }, null, 2),
+    datos_nuevos: JSON.stringify({ fallecido: "PATRICIA CASTILLO ROJAS", rut: "21371451-1", sepultura: "MIG-5086818", cementerio: "San Carlos" }, null, 2),
     hash_previo: "0000000000000000000000000000000000000000000000000000000000000000",
     hash_registro: "4a2f8b1c93a20e98ff7b6a1204cd194e823b7e41d8a1c93b6e82a94f1c9a8e02"
   },
@@ -64,9 +64,9 @@ const INITIAL_LOGS: AuditEntry[] = [
     modulo: "DERECHOS",
     accion: "ASIGNAR_ARRIENDO_PERPETUO",
     entidad_tipo: "tb_derecho",
-    entidad_id: "DER-2026-00088",
+    entidad_id: "DER-192675",
     datos_anteriores: JSON.stringify({ estado: "DISPONIBLE" }),
-    datos_nuevos: JSON.stringify({ estado: "OCUPADO", tipo: "PERPETUO", titular: "FAMILIA MUÑOZ SEPULVEDA" }, null, 2),
+    datos_nuevos: JSON.stringify({ estado: "OCUPADO", tipo: "ARRIENDO", titular: "MARIA ELENA HERNANDEZ CONTRERAS" }, null, 2),
     hash_previo: "4a2f8b1c93a20e98ff7b6a1204cd194e823b7e41d8a1c93b6e82a94f1c9a8e02",
     hash_registro: "7c19a4e823b7e41d8a1c93b6e82a94f1c9a8e02d18f4b1c93a20e98ff7b6a120"
   },

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Sidebar from "./Sidebar";
 import TopHeader from "./TopHeader";
+import ChatPanel from "./ChatPanel";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -55,6 +56,9 @@ export default function AppShell({ children }: AppShellProps) {
             </div>
           </div>
         </footer>
+
+        {/* AI Assistant Chat Panel (Logged-in staff) */}
+        <ChatPanel />
 
       </div>
     </div>

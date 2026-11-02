@@ -16,6 +16,7 @@ from app.domain.models.agenda_terreno import TareaTerreno, TipoTareaTerreno, Est
 from app.domain.models.grupo import Grupo, GrupoPermiso, ModuloSistema, NivelAcceso
 from app.domain.models.portal import ConfigPortal
 from app.domain.models.reserva import Reserva, EstadoReserva
+from app.domain.models.asistente import AsistenteConfig
 
 __all__ = [
     "Base",
@@ -55,5 +56,6 @@ __all__ = [
     "GrupoPermiso",
     "ModuloSistema",
     "NivelAcceso",
+    "AsistenteConfig",
 ]
 

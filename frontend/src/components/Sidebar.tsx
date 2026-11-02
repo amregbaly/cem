@@ -25,7 +25,8 @@ import {
   ChevronRight,
   Shield,
   Layers,
-  FileCheck2
+  FileCheck2,
+  Bot
 } from "lucide-react";
 import ThemeCustomizerModal from "./ThemeCustomizerModal";
 
@@ -109,6 +110,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       items: [
         { href: "/admin", label: "Control de Acceso & Grupos", icon: UserCog, badge: "RBAC" },
         { href: "/admin/temas", label: "Identidad Visual & Temas", icon: Palette },
+        { href: "/admin/asistente", label: "Asistente de IA", icon: Bot, badge: "IA" },
       ]
     }
   ];
@@ -244,7 +246,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* Navigation Sections */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 pb-6">
           {sectionsToRender.map((sec, secIdx) => (
             <div key={secIdx} className="space-y-1.5">
               <div className="px-3 text-[10px] font-bold tracking-widest uppercase opacity-50">

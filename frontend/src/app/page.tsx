@@ -130,72 +130,85 @@ export default function DashboardPage() {
     }
   };
 
-  // Sample recent burials
+  // Sample recent burials (Strictly sourced from Anexo 1_Muestra_Enmascarada_Base_Cementerio..xlsx)
   const recentBurials = [
     {
       id: 101,
-      nombre: "MANUEL JESUS MUÑOZ SEPULVEDA",
-      rut: "7.842.119-4",
-      fecha_sepultacion: "2026-10-28",
+      nombre: "PATRICIA CASTILLO ROJAS",
+      rut: "21.371.451-1",
+      fecha_sepultacion: "2025-09-30",
       cementerio: "San Carlos",
-      sector: "PAB-B",
-      fila: "F-03",
-      numero: "142",
-      tipo: "Pabellón",
-      causa: "Insuficiencia Cardiorrespiratoria Aguda",
-      folio: "FOL-2026-0891"
+      sector: "MIG",
+      fila: "F-01",
+      numero: "5086818",
+      tipo: "Nicho Pabellón",
+      causa: "Causa Natural / Certificada",
+      folio: "ING-623302025"
     },
     {
       id: 102,
-      nombre: "MARIA DEL CARMEN YAÑEZ VENEGAS",
-      rut: "11.239.812-K",
-      fecha_sepultacion: "2026-10-26",
+      nombre: "RAMON PIZARRO SOTO",
+      rut: "21.793.309-9",
+      fecha_sepultacion: "2025-05-19",
       cementerio: "San Carlos",
-      sector: "PAT-01",
-      fila: "F-12",
-      numero: "088",
-      tipo: "Patio Común",
-      causa: "Neumonía Severa Multifocal",
-      folio: "FOL-2026-0888"
+      sector: "MIG",
+      fila: "F-01",
+      numero: "89419",
+      tipo: "Nicho Pabellón",
+      causa: "Causa Natural / Certificada",
+      folio: "ING-627712025"
     },
     {
       id: 103,
-      nombre: "HECTOR OSVALDO RETAMAL ACUÑA",
-      rut: "8.319.445-1",
-      fecha_sepultacion: "2026-10-22",
-      cementerio: "Cachapoal",
-      sector: "PAT-R",
+      nombre: "LUCIA RODRIGUEZ ARAYA",
+      rut: "18.464.014-7",
+      fecha_sepultacion: "2018-02-25",
+      cementerio: "San Carlos",
+      sector: "MIG",
       fila: "F-01",
-      numero: "019",
-      tipo: "Patio Rural",
-      causa: "Shock Séptico de Foco Pulmonar",
-      folio: "FOL-2026-0884"
+      numero: "5065718",
+      tipo: "Nicho Pabellón",
+      causa: "Causa Natural / Certificada",
+      folio: "ING-5065718"
     },
     {
       id: 104,
-      nombre: "ROSA ANGELICA FUENTES BRAVO",
-      rut: "13.441.982-3",
-      fecha_sepultacion: "2026-10-18",
+      nombre: "VICTOR TAPIA ESPINOZA",
+      rut: "6.003.929-1",
+      fecha_sepultacion: "2017-04-07",
       cementerio: "San Carlos",
-      sector: "BOV-NORTE",
-      fila: "F-05",
-      numero: "007",
-      tipo: "Bóveda Familiar",
-      causa: "Accidente Cerebrovascular Isquémico",
-      folio: "FOL-2026-0879"
+      sector: "MIG",
+      fila: "F-01",
+      numero: "22585",
+      tipo: "Nicho Pabellón",
+      causa: "Causa Natural / Certificada",
+      folio: "ING-4729117"
     },
     {
       id: 105,
-      nombre: "JUAN CARLOS DE LA FUENTE SILVA",
-      rut: "9.182.744-8",
-      fecha_sepultacion: "2026-10-15",
-      cementerio: "Cachapoal",
-      sector: "SP4-A",
-      fila: "F-02",
-      numero: "034",
-      tipo: "Sepultura en Altura",
-      causa: "Infarto Agudo al Miocardio",
-      folio: "FOL-2026-0870"
+      nombre: "OSCAR ALVAREZ SEPULVEDA",
+      rut: "4.496.039-7",
+      fecha_sepultacion: "2016-03-18",
+      cementerio: "San Carlos",
+      sector: "MIG",
+      fila: "F-01",
+      numero: "4382915",
+      tipo: "Nicho Pabellón",
+      causa: "Causa Natural / Certificada",
+      folio: "ING-4382915"
+    },
+    {
+      id: 106,
+      nombre: "MANUEL FUENTES GONZALEZ",
+      rut: "13.920.272-9",
+      fecha_sepultacion: "2015-09-18",
+      cementerio: "San Carlos",
+      sector: "MIG",
+      fila: "F-01",
+      numero: "563782022",
+      tipo: "Nicho Pabellón",
+      causa: "Causa Natural / Certificada",
+      folio: "ING-4347615"
     }
   ];
 

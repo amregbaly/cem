@@ -619,291 +619,101 @@ def init_db(db: Session) -> None:
 
 def seed_spatial_sample_data(db: Session) -> None:
     """
-    Seeds rich GIS spatial slots for San Carlos and Cachapoal with all 5 color states:
-    🟢 DISPONIBLE, 🔴 OCUPADO, 🟡 RESERVADO, 🟠 ARRIENDO_VENCIDO (30/60/90d), ⚪ BLOQUEADO.
-    Also seeds sample field tasks, certificates, and historical occupant chains.
+    Populates operational sample data exclusively from Anexo 1_Muestra_Enmascarada_Base_Cementerio..xlsx.
+    Ensures all sample deceased, titles, burials, locations and masons match the municipal sample.
     """
-    from datetime import date, timedelta
+    import os
+    from datetime import date
     from app.domain.models import (
-        Ubicacion, Persona, Inhumacion, Derecho, Certificado, TareaTerreno, Maestro, DerechosMaestros
+        Ubicacion, Persona, Inhumacion, Derecho, Certificado, TareaTerreno, Maestro, DerechosMaestros, ConfigPortal
     )
     from app.infrastructure.services.pdf_generator import generate_certificate_pdf
+    from etl.migrate_excel import ExcelMigrator
 
     cem_sc = db.query(Cementerio).filter_by(codigo="SAN_CARLOS").first()
     cem_cpt = db.query(Cementerio).filter_by(codigo="CACHAPOAL").first()
     if not cem_sc or not cem_cpt:
         return
 
-    today = date.today()
-
-    # Seed Spatial Grid Slots if PAB-A not present
-    if db.query(Ubicacion).filter(Ubicacion.sector_codigo == "PAB-A").count() == 0:
-        # Create Masons if needed
-        maestro_juan = db.query(Maestro).filter_by(rut="12345678-5").first()
-        if not maestro_juan:
-            maestro_juan = Maestro(
-                rut="12345678-5",
-                nombres="JUAN BAUTISTA",
-                apellido_paterno="MORALES",
-                apellido_materno="SOTO",
-                telefono="+56991234567",
-                activo=True
-            )
-            db.add(maestro_juan)
-            db.flush()
-
-        # Seed Persons (Deceased & Titleholders)
-        personas_data = [
-            ("7842119-4", "MANUEL JESUS MUÑOZ SEPULVEDA", "MANUEL JESUS", "MUÑOZ", "SEPULVEDA"),
-            ("11239812-K", "MARIA DEL CARMEN YAÑEZ VENEGAS", "MARIA DEL CARMEN", "YAÑEZ", "VENEGAS"),
-            ("8319445-1", "HECTOR OSVALDO RETAMAL ACUÑA", "HECTOR OSVALDO", "RETAMAL", "ACUÑA"),
-            ("15678912-3", "CARLOS ALBERTO DE LA FUENTE RIVAS", "CARLOS ALBERTO", "DE LA FUENTE", "RIVAS"),
-            ("9876543-2", "GLADYS ELENA SAN MARTIN VALENZUELA", "GLADYS ELENA", "SAN MARTIN", "VALENZUELA"),
-            ("12987654-8", "ROBERTO ANDRES SEPULVEDA PARRA", "ROBERTO ANDRES", "SEPULVEDA", "PARRA"),
-            ("14567890-1", "TERESA DE JESUS GONZALEZ BUSTOS", "TERESA DE JESUS", "GONZALEZ", "BUSTOS"),
-            ("17890123-4", "FRANCISCO JAVIER PINOCHET CONTRERAS", "FRANCISCO JAVIER", "PINOCHET", "CONTRERAS"),
+    # If no inhumations present, run ExcelMigrator on Anexo 1
+    if db.query(Inhumacion).count() == 0:
+        candidates = [
+            "/home/amr/dev/cem2/Anexo 1_Muestra_Enmascarada_Base_Cementerio..xlsx",
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../Anexo 1_Muestra_Enmascarada_Base_Cementerio..xlsx")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../Anexo 1_Muestra_Enmascarada_Base_Cementerio..xlsx")),
         ]
+        target_excel = None
+        for c in candidates:
+            if c and os.path.exists(c):
+                target_excel = c
+                break
 
-        persons = {}
-        for rut, nom_comp, nom, ap_p, ap_m in personas_data:
-            p = db.query(Persona).filter_by(rut=rut).first()
-            if not p:
-                p = Persona(
-                    rut=rut,
-                    nombre_completo=nom_comp,
-                    nombres=nom,
-                    apellido_paterno=ap_p,
-                    apellido_materno=ap_m,
-                    rut_validado=True,
-                    celular="+569" + rut.replace("-", "")[:8],
-                    email=f"{nom.lower().split()[0]}.{ap_p.lower()}@gmail.com"
-                )
-                db.add(p)
-                db.flush()
-            persons[rut] = p
+        if target_excel:
+            try:
+                migrator = ExcelMigrator(target_excel, db)
+                migrator.migrate_all()
+            except Exception as e:
+                print(f"[!] Migration error in init_db: {e}")
 
-        # Grid Definitions for Sectors
-        # Sector 1: PAB-A (San Carlos - Pabellón A: 4 rows x 8 cols = 32 slots)
-        for row in range(1, 5):
-            for col in range(1, 9):
-                num = f"{(row - 1) * 8 + col:03d}"
-                # Distribution of states:
-                # col 1, 2, 3 -> Occupied
-                # col 4 -> Expired / Expiring
-                # col 5 -> Reserved
-                # col 6 -> Blocked (Maintenance)
-                # col 7, 8 -> Available
-                if col in (1, 2, 3):
-                    estado = "OCUPADO"
-                    cap_oc = 1
-                elif col == 4:
-                    estado = "ARRIENDO_VENCIDO"
-                    cap_oc = 1
-                elif col == 5:
-                    estado = "RESERVADO"
-                    cap_oc = 0
-                elif col == 6:
-                    estado = "BLOQUEADO"
-                    cap_oc = 0
-                else:
-                    estado = "DISPONIBLE"
-                    cap_oc = 0
+    # Ensure ubicaciones have grid coordinates for GIS layout
+    for idx, ub in enumerate(db.query(Ubicacion).all()):
+        if ub.grid_x is None:
+            ub.grid_x = (idx % 8) + 1
+            ub.grid_y = (idx // 8) + 1
+            ub.sector_code = ub.sector_codigo
 
-                ub = Ubicacion(
-                    cementerio_id=cem_sc.id,
-                    tipo_ubicacion="PAB",
-                    sector_codigo="PAB-A",
-                    sector_code="PAB-A",
-                    fila=f"F-{row:02d}",
-                    numero=num,
-                    capacidad_total=1,
-                    capacidad_ocupada=cap_oc,
-                    estado=estado,
-                    grid_x=col,
-                    grid_y=row,
-                    observaciones=f"Nicho Pabellón A Fila {row} Número {num}"
-                )
-                db.add(ub)
-                db.flush()
-
-                # Attach Inhumations & Rights for realistic dossier
-                if estado in ("OCUPADO", "ARRIENDO_VENCIDO"):
-                    pers = persons.get("7842119-4") if col == 1 else (persons.get("11239812-K") if col == 2 else persons.get("8319445-1"))
-                    if pers:
-                        inh = Inhumacion(
-                            ubicacion_id=ub.id,
-                            fallecido_persona_id=pers.id,
-                            numero_ingreso=f"ING-2024-{ub.id:04d}",
-                            fecha_defuncion=today - timedelta(days=200),
-                            fecha_sepultacion=today - timedelta(days=198),
-                            causa_fallecimiento="Paro cardiorrespiratorio",
-                            pase_sepultacion_folio=f"LIC-2024-{ub.id:04d}"
-                        )
-                        db.add(inh)
-
-                    # Lease
-                    titular = persons.get("15678912-3")
-                    if titular:
-                        if col == 4:
-                            # Expiring in 18 days (Orange 30d alert) or expired
-                            venc = today + timedelta(days=18) if row % 2 == 0 else today - timedelta(days=35)
-                        else:
-                            venc = today + timedelta(days=700)
-
-                        der = Derecho(
-                            ubicacion_id=ub.id,
-                            titular_persona_id=titular.id,
-                            tipo_derecho="ARRIENDO",
-                            periodo_arriendo="5_ANOS",
-                            fecha_inicio=today - timedelta(days=1100),
-                            fecha_vencimiento=venc,
-                            monto_pagado=185000.0,
-                            folio_recibo=f"REC-2021-{ub.id:04d}",
-                            estado="VENCIDO" if venc < today else "VIGENTE"
-                        )
-                        db.add(der)
-
-        # Sector 2: PAT-01 (San Carlos - Patio 1 Tierra: 3 rows x 8 cols = 24 slots)
-        for row in range(1, 4):
-            for col in range(1, 9):
-                num = f"{(row - 1) * 8 + col:03d}"
-                estado = "OCUPADO" if col <= 4 else ("ARRIENDO_VENCIDO" if col == 5 else "DISPONIBLE")
-                ub = Ubicacion(
-                    cementerio_id=cem_sc.id,
-                    tipo_ubicacion="PAT",
-                    sector_codigo="PAT-01",
-                    sector_code="PAT-01",
-                    fila=f"F-{row:02d}",
-                    numero=num,
-                    capacidad_total=2,
-                    capacidad_ocupada=1 if estado != "DISPONIBLE" else 0,
-                    estado=estado,
-                    grid_x=col,
-                    grid_y=row
-                )
-                db.add(ub)
-                db.flush()
-
-                if estado == "ARRIENDO_VENCIDO":
-                    der = Derecho(
-                        ubicacion_id=ub.id,
-                        titular_persona_id=persons["9876543-2"].id,
-                        tipo_derecho="ARRIENDO",
-                        periodo_arriendo="20_ANOS",
-                        fecha_inicio=today - timedelta(days=7300),
-                        fecha_vencimiento=today + timedelta(days=45),  # 60d threshold alert!
-                        monto_pagado=450000.0,
-                        folio_recibo=f"REC-2006-{ub.id:04d}",
-                        estado="VIGENTE"
-                    )
-                    db.add(der)
-
-        # Sector 3: PAT-R (Cachapoal - Patio Rural: 3 rows x 6 cols = 18 slots)
-        for row in range(1, 4):
-            for col in range(1, 7):
-                num = f"R-{(row - 1) * 6 + col:03d}"
-                estado = "OCUPADO" if col <= 3 else "DISPONIBLE"
-                ub = Ubicacion(
-                    cementerio_id=cem_cpt.id,
-                    tipo_ubicacion="PAT",
-                    sector_codigo="PAT-R",
-                    sector_code="PAT-R",
-                    fila=f"F-{row:02d}",
-                    numero=num,
-                    capacidad_total=1,
-                    capacidad_ocupada=1 if estado == "OCUPADO" else 0,
-                    estado=estado,
-                    grid_x=col,
-                    grid_y=row
-                )
-                db.add(ub)
-
-    # Seed Sample Municipal Certificate with QR if not present
-    if db.query(Certificado).count() == 0:
-        pdf_b, sha_hash, qr_b64 = generate_certificate_pdf(
-            folio="CERT-2026-0089",
-            token_verificacion="e78f3c42918b45a0d3198e72fa0124cc",
-            tipo_certificado="INHUMACION",
-            cementerio_nombre="Cementerio Municipal de San Carlos",
-            codigo_ubicacion="PAB-A-F01-N001",
-            fallecido_nombre="MANUEL JESUS MUÑOZ SEPULVEDA",
-            rut_fallecido="7.842.119-4",
-            titular_nombre="CARLOS ALBERTO DE LA FUENTE RIVAS",
-            rut_titular="15.678.912-3",
-            fecha_emision=today
-        )
-        cert_sample = Certificado(
-            folio="CERT-2026-0089",
-            token_verificacion="e78f3c42918b45a0d3198e72fa0124cc",
-            tipo_certificado="INHUMACION",
-            estado="VIGENTE",
-            cementerio_id=cem_sc.id,
-            fallecido_nombre="MANUEL JESUS MUÑOZ SEPULVEDA",
-            rut_fallecido="7.842.119-4",
-            titular_nombre="CARLOS ALBERTO DE LA FUENTE RIVAS",
-            rut_titular="15.678.912-3",
-            codigo_ubicacion="PAB-A-F01-N001",
-            fecha_emision=today,
-            sha256_hash=sha_hash,
-            codigo_qr_base64=qr_b64,
-            observaciones="Certificado oficial de sepultación con firma digital y validación QR Ley 19.799"
-        )
-        db.add(cert_sample)
-
-    # Seed Field Crew Tasks for Today (Sepultureros agenda)
-    if db.query(TareaTerreno).count() == 0:
-        tasks_seed = [
-            TareaTerreno(
-                folio_orden=f"ORD-{today.year}-0101",
-                cementerio_id=cem_sc.id,
-                tipo_tarea="INHUMACION",
-                estado="PENDIENTE",
-                fallecido_nombre="TERESA DE JESUS GONZALEZ BUSTOS",
-                rut_fallecido="14.567.890-1",
-                solicitante_nombre="ROBERTO SEPULVEDA",
-                fecha_programada=today,
-                hora_programada="11:30",
-                sepulturero_asignado="Cuadrilla 1 (Héctor & Manuel)",
-                observaciones="Sepultación en Nicho Pabellón A. Verificar recepción de pase médico."
-            ),
-        TareaTerreno(
-            folio_orden=f"ORD-{today.year}-0102",
-            cementerio_id=cem_sc.id,
-            tipo_tarea="MANTENCION",
-            estado="EN_PROCESO",
-            solicitante_nombre="Administración Municipal",
-            fecha_programada=today,
-            hora_programada="14:00",
-            sepulturero_asignado="Cuadrilla 2",
-            observaciones="Reparación de solera y encalado en vereda norte Patio 1."
-        ),
-        TareaTerreno(
-            folio_orden=f"ORD-{today.year}-0103",
-            cementerio_id=cem_cpt.id,
-            tipo_tarea="EXHUMACION",
-            estado="PENDIENTE",
-            fallecido_nombre="FRANCISCO JAVIER PINOCHET CONTRERAS",
-            rut_fallecido="17.890.123-4",
-            solicitante_nombre="Familia Pinochet",
-            fecha_programada=today,
-            hora_programada="16:00",
-            sepulturero_asignado="Cuadrilla Cachapoal",
-            observaciones="Traslado interno con autorización de Seremi de Salud N° 4421."
-            )
-        ]
-        for t in tasks_seed:
-            db.add(t)
-
-    # 13. Seed ConfigPortal (Default: Visitors only see certificates, death list hidden by default)
+    # Seed ConfigPortal (Enable list of deceased for municipal transparency)
     portal_cfg = db.query(ConfigPortal).first()
     if not portal_cfg:
         portal_cfg = ConfigPortal(
-            permitir_lista_fallecidos=False,
-            permitir_busqueda_publica=False,
+            permitir_lista_fallecidos=True,
+            permitir_busqueda_publica=True,
             titulo_portal="Portal Ciudadano de Certificados Municipales",
             mensaje_portal="Verificación digital y autenticidad de certificados para los Cementerios de San Carlos y Cachapoal (Ley 21.719)."
         )
         db.add(portal_cfg)
+    else:
+        portal_cfg.permitir_lista_fallecidos = True
+        portal_cfg.permitir_busqueda_publica = True
+
+    # Seed Sample Certificate using real deceased from Anexo 1
+    sample_inh = db.query(Inhumacion).first()
+    if sample_inh and db.query(Certificado).count() == 0:
+        fallecido_nombre = sample_inh.fallecido.nombre_completo if sample_inh.fallecido else "JORGE MORALES"
+        rut_fallecido = sample_inh.fallecido.rut if sample_inh.fallecido else "NN"
+        today = date.today()
+        try:
+            pdf_b, sha_hash, qr_b64 = generate_certificate_pdf(
+                folio=f"CERT-{sample_inh.numero_ingreso or '2026-0001'}",
+                token_verificacion="e78f3c42918b45a0d3198e72fa0124cc",
+                tipo_certificado="INHUMACION",
+                cementerio_nombre=cem_sc.nombre,
+                codigo_ubicacion=f"{sample_inh.ubicacion.sector_codigo}-{sample_inh.ubicacion.numero}",
+                fallecido_nombre=fallecido_nombre,
+                rut_fallecido=rut_fallecido,
+                titular_nombre="ADMINISTRACION MUNICIPAL",
+                rut_titular="69.140.100-3",
+                fecha_emision=today
+            )
+            cert_sample = Certificado(
+                folio=f"CERT-{sample_inh.numero_ingreso or '2026-0001'}",
+                token_verificacion="e78f3c42918b45a0d3198e72fa0124cc",
+                tipo_certificado="INHUMACION",
+                estado="VIGENTE",
+                cementerio_id=cem_sc.id,
+                fallecido_nombre=fallecido_nombre,
+                rut_fallecido=rut_fallecido,
+                titular_nombre="ADMINISTRACION MUNICIPAL",
+                rut_titular="69.140.100-3",
+                codigo_ubicacion=f"{sample_inh.ubicacion.sector_codigo}-{sample_inh.ubicacion.numero}",
+                fecha_emision=today,
+                sha256_hash=sha_hash,
+                codigo_qr_base64=qr_b64,
+                observaciones="Certificado oficial de sepultación con firma digital y validación QR Ley 19.799"
+            )
+            db.add(cert_sample)
+        except Exception:
+            pass
 
     db.commit()
 

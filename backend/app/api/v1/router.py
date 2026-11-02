@@ -15,7 +15,8 @@ from app.api.v1.endpoints import (
     grupos,
     portal,
     exhumaciones,
-    reservas
+    reservas,
+    asistente
 )
 
 api_router = APIRouter()
@@ -37,4 +38,5 @@ api_router.include_router(certificados.router, prefix="/certificados", tags=["Ce
 api_router.include_router(arriendos.router, prefix="/arriendos", tags=["Control de Arriendos & Vencimientos"])
 api_router.include_router(terreno.router, prefix="/terreno", tags=["PWA Operarios en Terreno"])
 api_router.include_router(maestros.router, prefix="/maestros", tags=["Derechos de Maestros & Obras"])
+api_router.include_router(asistente.router, prefix="/asistente", tags=["Asistente de IA (Módulo Opcional)"])
 
