@@ -101,16 +101,19 @@ def get_vencimientos_radar(
         item = {
             "id": d.id,
             "ubicacion_id": d.ubicacion_id,
-            "codigo_ubicacion": d.ubicacion.codigo_completo,
-            "cementerio": d.ubicacion.cementerio.nombre,
-            "titular": d.titular.nombre_completo,
-            "rut_titular": d.titular.rut if is_staff else "[CONFIDENCIAL LEY 21.719]",
-            "telefono": (d.titular.celular or d.titular.telefono) if is_staff else "[PROTEGIDO]",
-            "email": d.titular.email if is_staff else "[PROTEGIDO]",
-            "fecha_inicio": d.fecha_inicio.isoformat(),
-            "fecha_vencimiento": d.fecha_vencimiento.isoformat(),
+            "codigo_ubicacion": d.ubicacion.codigo_completo if d.ubicacion else f"UBIC-{d.ubicacion_id}",
+            "cementerio": d.ubicacion.cementerio.nombre if d.ubicacion and d.ubicacion.cementerio else "San Carlos",
+            "titular": d.titular.nombre_completo if d.titular else "Sin titular",
+            "rut_titular": (d.titular.rut if d.titular else "N/A") if is_staff else "[CONFIDENCIAL LEY 21.719]",
+            "telefono": ((d.titular.celular or d.titular.telefono) if d.titular else None) if is_staff else "[PROTEGIDO]",
+            "email": (d.titular.email if d.titular else None) if is_staff else "[PROTEGIDO]",
+            "fecha_inicio": d.fecha_inicio.isoformat() if d.fecha_inicio else "",
+            "fecha_vencimiento": d.fecha_vencimiento.isoformat() if d.fecha_vencimiento else "",
             "dias_restantes": diff,
-            "periodo": d.periodo_arriendo,
+            "periodo": d.periodo_arriendo or "TEMPORAL",
+            "periodo_arriendo": d.periodo_arriendo or "TEMPORAL",
+            "tipo_derecho": d.tipo_derecho or "ARRIENDO",
+            "monto_pagado": float(d.monto_pagado) if d.monto_pagado is not None else 0.0,
             "estado": d.estado,
             "alerta_nivel": "CRITICO_VENCIDO" if diff < 0 else ("ALERTA_30D" if diff <= 30 else ("AVISO_60D" if diff <= 60 else "INFO_90D"))
         }
@@ -141,7 +144,8 @@ def get_vencimientos_radar(
             "total_30_dias": len(dias_30),
             "total_60_dias": len(dias_60),
             "total_90_dias": len(dias_90),
-            "total_atencion_requerida": len(vencidos) + len(dias_30) + len(dias_60) + len(dias_90)
+            "total_atencion_requerida": len(vencidos) + len(dias_30) + len(dias_60) + len(dias_90),
+            "total_alertas_activas": len(vencidos) + len(dias_30) + len(dias_60) + len(dias_90)
         },
         "detalles": detalles
     }

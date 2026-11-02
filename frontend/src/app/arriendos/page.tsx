@@ -38,12 +38,13 @@ interface LeaseDetail {
   telefono: string | null;
   email: string | null;
   tipo_derecho: string;
-  periodo_arriendo: string;
+  periodo_arriendo?: string;
+  periodo?: string;
   fecha_inicio: string | null;
   fecha_vencimiento: string | null;
   dias_restantes: number;
   monto_pagado: number;
-  estado: "VENCIDO" | "POR_VENCER";
+  estado: "VENCIDO" | "POR_VENCER" | string;
 }
 
 export default function ArriendosPage() {
@@ -78,8 +79,14 @@ export default function ArriendosPage() {
       const res = await fetch(`${apiUrl}/api/v1/arriendos/vencimientos?${cemParam}${filterParam}`);
       if (!res.ok) throw new Error("Error cargando vencimientos");
       const data = await res.json();
-      setSummary(data.resumen);
-      setLeases(data.detalles);
+      setSummary({
+        total_vencidos: data.resumen?.total_vencidos ?? 0,
+        total_30_dias: data.resumen?.total_30_dias ?? 0,
+        total_60_dias: data.resumen?.total_60_dias ?? 0,
+        total_90_dias: data.resumen?.total_90_dias ?? 0,
+        total_alertas_activas: data.resumen?.total_alertas_activas ?? data.resumen?.total_atencion_requerida ?? 0
+      });
+      setLeases(data.detalles || []);
     } catch {
       // High fidelity fallback sample
       const fallbackSummary: LeaseSummary = {
@@ -169,11 +176,12 @@ export default function ArriendosPage() {
   };
 
   const filteredLeases = leases.filter(l => {
-    const q = search.toLowerCase();
+    const q = (search || "").toLowerCase().trim();
+    if (!q) return true;
     return (
-      l.titular.toLowerCase().includes(q) ||
-      l.rut_titular.includes(q) ||
-      l.codigo_ubicacion.toLowerCase().includes(q)
+      (l.titular || "").toLowerCase().includes(q) ||
+      (l.rut_titular || "").toLowerCase().includes(q) ||
+      (l.codigo_ubicacion || "").toLowerCase().includes(q)
     );
   });
 
@@ -188,7 +196,14 @@ export default function ArriendosPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
               Motor de Arriendos y Vencimientos
             </h1>
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+            <span 
+              className="px-3 py-1 rounded-full text-xs font-bold border"
+              style={{
+                backgroundColor: "rgba(248, 172, 26, 0.15)",
+                color: "#B45309",
+                borderColor: "rgba(248, 172, 26, 0.3)"
+              }}
+            >
               Radar 30/60/90 Días
             </span>
           </div>
@@ -202,7 +217,8 @@ export default function ArriendosPage() {
           href={`${apiUrl}/api/v1/arriendos/exportar${cemeteryFilter ? `?cementerio_id=${cemeteryFilter}` : ""}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md self-start"
+          className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl text-white text-xs font-bold transition-all shadow-md self-start hover:opacity-95"
+          style={{ backgroundColor: "var(--color-secondary)" }}
         >
           <Download className="w-4 h-4" />
           <span>Exportar a Excel / CSV</span>
@@ -214,9 +230,12 @@ export default function ArriendosPage() {
         <button
           onClick={() => setDiasFiltro(null)}
           className={`p-4 rounded-2xl border text-left transition-all ${
-            diasFiltro === null ? "ring-2 ring-blue-500 shadow-md" : "hover:border-gray-400"
+            diasFiltro === null ? "ring-2 shadow-md" : "hover:border-gray-400"
           }`}
-          style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+          style={{ 
+            backgroundColor: "var(--color-surface)", 
+            borderColor: diasFiltro === null ? "var(--color-primary)" : "var(--color-border)"
+          }}
         >
           <span className="text-xs font-bold text-gray-400 uppercase">Todas las Alertas</span>
           <p className="text-2xl font-black mt-1" style={{ color: "var(--color-text)" }}>
@@ -300,19 +319,34 @@ export default function ArriendosPage() {
         <div className="flex items-center space-x-2 self-start sm:self-auto">
           <button
             onClick={() => setCemeteryFilter(null)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold ${cemeteryFilter === null ? "bg-gray-800 text-white dark:bg-white dark:text-gray-900" : "text-gray-500"}`}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+            style={{
+              backgroundColor: cemeteryFilter === null ? "var(--color-primary)" : "transparent",
+              color: cemeteryFilter === null ? "#FFFFFF" : "var(--color-text)",
+              border: "1px solid var(--color-border)"
+            }}
           >
             Ambos Cementerios
           </button>
           <button
             onClick={() => setCemeteryFilter(1)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold ${cemeteryFilter === 1 ? "bg-blue-600 text-white" : "text-gray-500"}`}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+            style={{
+              backgroundColor: cemeteryFilter === 1 ? "var(--color-primary)" : "transparent",
+              color: cemeteryFilter === 1 ? "#FFFFFF" : "var(--color-text)",
+              border: "1px solid var(--color-border)"
+            }}
           >
             San Carlos
           </button>
           <button
             onClick={() => setCemeteryFilter(2)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold ${cemeteryFilter === 2 ? "bg-emerald-600 text-white" : "text-gray-500"}`}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+            style={{
+              backgroundColor: cemeteryFilter === 2 ? "var(--color-secondary)" : "transparent",
+              color: cemeteryFilter === 2 ? "#FFFFFF" : "var(--color-text)",
+              border: "1px solid var(--color-border)"
+            }}
           >
             Cachapoal
           </button>
@@ -351,29 +385,39 @@ export default function ArriendosPage() {
                 </tr>
               ) : (
                 filteredLeases.map((lease) => {
-                  const isExpired = lease.dias_restantes < 0;
-                  const isUrgent = lease.dias_restantes <= 30 && !isExpired;
+                  const diasRestantes = lease.dias_restantes ?? 0;
+                  const isExpired = diasRestantes < 0;
+                  const isUrgent = diasRestantes <= 30 && !isExpired;
+                  const rawPeriodo = lease.periodo_arriendo || lease.periodo || "TEMPORAL";
+                  const periodoText = String(rawPeriodo).replace(/_/g, " ");
 
                   return (
                     <tr key={lease.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                       <td className="p-4 font-mono font-bold">
-                        <span className="text-blue-600 dark:text-blue-400">{lease.codigo_ubicacion}</span>
-                        <span className="block text-[10px] text-gray-400 font-normal">{lease.cementerio}</span>
+                        <span style={{ color: "var(--color-secondary)" }}>{lease.codigo_ubicacion || "S/C"}</span>
+                        <span className="block text-[10px] text-gray-400 font-normal">{lease.cementerio || "San Carlos"}</span>
                       </td>
 
                       <td className="p-4">
-                        <p className="font-bold text-gray-800 dark:text-gray-200">{lease.titular}</p>
-                        <p className="text-[11px] font-mono text-gray-400">RUT: {lease.rut_titular}</p>
+                        <p className="font-bold text-gray-800 dark:text-gray-200">{lease.titular || "Sin titular"}</p>
+                        <p className="text-[11px] font-mono text-gray-400">RUT: {lease.rut_titular || "N/A"}</p>
                       </td>
 
                       <td className="p-4">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                          {lease.periodo_arriendo.replace("_", " ")}
+                        <span 
+                          className="px-2 py-0.5 rounded-full text-[10px] font-bold border"
+                          style={{
+                            backgroundColor: "rgba(15, 117, 115, 0.1)",
+                            color: "var(--color-secondary)",
+                            borderColor: "rgba(15, 117, 115, 0.2)"
+                          }}
+                        >
+                          {periodoText}
                         </span>
                       </td>
 
                       <td className="p-4 font-mono">
-                        {lease.fecha_vencimiento}
+                        {lease.fecha_vencimiento || "-"}
                       </td>
 
                       <td className="p-4">
@@ -384,14 +428,15 @@ export default function ArriendosPage() {
                             ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 animate-pulse"
                             : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
                         }`}>
-                          {isExpired ? `Vencido (${Math.abs(lease.dias_restantes)}d)` : `${lease.dias_restantes} días`}
+                          {isExpired ? `Vencido (${Math.abs(diasRestantes)}d)` : `${diasRestantes} días`}
                         </span>
                       </td>
 
                       <td className="p-4 text-right">
                         <button
                           onClick={() => setNotifyingLease(lease)}
-                          className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-sm"
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition-all shadow-sm hover:opacity-90"
+                          style={{ backgroundColor: "var(--color-primary)" }}
                         >
                           Notificar Titular
                         </button>
@@ -414,7 +459,10 @@ export default function ArriendosPage() {
           >
             <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: "var(--color-border)" }}>
               <div className="flex items-center space-x-3">
-                <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <div 
+                  className="p-2.5 rounded-xl"
+                  style={{ backgroundColor: "rgba(172, 17, 91, 0.1)", color: "var(--color-primary)" }}
+                >
                   <Send className="w-5 h-5" />
                 </div>
                 <div>
@@ -448,7 +496,7 @@ export default function ArriendosPage() {
                 <div className="space-y-2">
                   <div className="p-3 rounded-2xl border flex items-center justify-between" style={{ borderColor: "var(--color-border)" }}>
                     <div className="flex items-center space-x-2.5">
-                      <Mail className="w-4 h-4 text-blue-500" />
+                      <Mail className="w-4 h-4 text-emerald-600" />
                       <div>
                         <span className="font-bold">Correo Electrónico (Email)</span>
                         <p className="text-gray-400 text-[11px]">{notifyingLease.email || "titular@correo.cl"}</p>
@@ -490,7 +538,8 @@ export default function ArriendosPage() {
                   <button
                     onClick={() => handleSendNotification(["EMAIL", "SMS", "WHATSAPP"])}
                     disabled={isSending}
-                    className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md flex items-center space-x-1.5"
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md flex items-center space-x-1.5 transition-all hover:opacity-90"
+                    style={{ backgroundColor: "var(--color-primary)" }}
                   >
                     <Send className="w-4 h-4" />
                     <span>{isSending ? "Despachando..." : "Despachar Alerta Multicanal"}</span>

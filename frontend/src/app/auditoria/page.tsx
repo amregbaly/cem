@@ -349,7 +349,9 @@ export default function AuditoriaPage() {
               {filteredLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-mono">
                   <td className="p-3.5 font-bold">{log.id}</td>
-                  <td className="p-3.5 text-gray-500 font-sans">{log.creado_en.replace("T", " ").substring(0, 19)}</td>
+                  <td className="p-3.5 text-gray-500 font-sans">
+                    {log.creado_en ? log.creado_en.replace("T", " ").substring(0, 19) : "-"}
+                  </td>
                   <td className="p-3.5 font-sans">
                     <div className="font-semibold">{log.usuario_id}</div>
                     <div className="text-[11px] text-gray-400">{log.rut_usuario}</div>
