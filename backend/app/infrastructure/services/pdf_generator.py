@@ -12,6 +12,20 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 
 
+def get_logo_path() -> Optional[str]:
+    """Finds the municipal logo file from local paths."""
+    candidates = [
+        "/home/amr/dev/cem2/logo.png",
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../logo.png")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../frontend/public/logo.png")),
+        os.path.abspath("logo.png")
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return None
+
+
 def generate_certificate_pdf(
     folio: str,
     token_verificacion: str,
@@ -61,8 +75,8 @@ def generate_certificate_pdf(
         pagesize=letter,
         rightMargin=40,
         leftMargin=40,
-        topMargin=40,
-        bottomMargin=40
+        topMargin=35,
+        bottomMargin=35
     )
 
     styles = getSampleStyleSheet()
@@ -72,7 +86,7 @@ def generate_certificate_pdf(
         fontName="Helvetica-Bold",
         fontSize=15,
         leading=18,
-        textColor=colors.HexColor("#065F46"),
+        textColor=colors.HexColor("#AC115B"),  # San Carlos Municipal Raspberry
         alignment=1  # Center
     )
     subtitle_style = ParagraphStyle(
@@ -112,11 +126,22 @@ def generate_certificate_pdf(
 
     story = []
 
-    # Header Municipal
+    # Header Municipal with Official Logo
+    logo_file = get_logo_path()
+    if logo_file:
+        try:
+            # 476 x 192 -> aspect ratio ~2.48
+            logo_img = RLImage(logo_file, width=2.2 * inch, height=0.887 * inch)
+            logo_img.hAlign = 'CENTER'
+            story.append(logo_img)
+            story.append(Spacer(1, 6))
+        except Exception:
+            pass
+
     story.append(Paragraph("REPÚBLICA DE CHILE", subtitle_style))
     story.append(Paragraph("ILUSTRE MUNICIPALIDAD DE SAN CARLOS", subtitle_style))
     story.append(Paragraph("ADMINISTRACIÓN GENERAL DE CEMENTERIOS MUNICIPALES", subtitle_style))
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 8))
 
     # Certificate Title
     tipo_human = {
@@ -129,7 +154,7 @@ def generate_certificate_pdf(
     story.append(Paragraph(tipo_human, title_style))
     story.append(Spacer(1, 6))
     story.append(Paragraph(f"FOLIO N°: <b>{folio}</b> &nbsp;&nbsp;|&nbsp;&nbsp; CEMENTERIO: <b>{cementerio_nombre.upper()}</b>", subtitle_style))
-    story.append(Spacer(1, 15))
+    story.append(Spacer(1, 12))
 
     # Legal Preamble
     preamble = (
@@ -204,7 +229,7 @@ def generate_certificate_pdf(
         f"<b>VALIDACIÓN DE AUTENTICIDAD DIGITAL</b><br/>"
         f"Este documento municipal incorpora firma electrónica y sello criptográfico QR conforme a la Ley N° 19.799.<br/>"
         f"Para verificar la vigencia de este certificado, escanee el código QR o ingrese a:<br/>"
-        f"<font color='#047857'><b>{verify_url}</b></font><br/><br/>"
+        f"<font color='#0F7573'><b>{verify_url}</b></font><br/><br/>"
         f"<b>Autoridad Emisora:</b> {autoridad_emisora}<br/>"
         f"<b>Oficial Habilitado:</b> {funcionario_emisor}<br/>"
         f"<b>Token Criptográfico:</b> {token_verificacion}"
@@ -214,8 +239,8 @@ def generate_certificate_pdf(
         [qr_flowable, Paragraph(auth_text, body_normal)]
     ], colWidths=[110, 400])
     qr_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#ECFDF5")),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor("#059669")),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#F0FDFA")),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor("#0F7573")),
         ('PADDING', (0, 0), (-1, -1), 8),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))

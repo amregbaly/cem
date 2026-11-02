@@ -93,7 +93,59 @@ export default function InhumacionesPage() {
       .finally(() => {
         setLoadingConfig(false);
       });
+
+    // Optionally load live burials from backend API
+    fetch(`${apiUrl}/api/v1/inhumaciones`)
+      .then(res => {
+        if (!res.ok) throw new Error("Acceso restringido");
+        return res.json();
+      })
+      .then((data: any[]) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((item, idx) => ({
+            id: item.id || idx + 1,
+            folio: item.pase_sepultacion_folio || item.numero_ingreso || `FOL-2026-${String(item.id || idx + 1).padStart(4, "0")}`,
+            nombre: item.nombre_fallecido || "PERSONA NO IDENTIFICADA",
+            rut: item.rut_fallecido || "NN",
+            cementerio: item.ubicacion_codigo?.includes("PAT-R") ? "Cachapoal" : "San Carlos",
+            sector: item.ubicacion_codigo?.split("-")[0] || "PAB-A",
+            fila: item.ubicacion_codigo?.split("-")[1] || "F-01",
+            numero: item.ubicacion_codigo?.split("-")[2] || "001",
+            tipo: "Inhumación Oficial",
+            fecha_sepultacion: item.fecha_sepultacion || "2026-10-28",
+            fecha_defuncion: item.fecha_defuncion || "2026-10-25",
+            causa: item.causa_fallecimiento || "Insuficiencia Cardiorrespiratoria",
+            ubicacion_codigo: item.ubicacion_codigo
+          }));
+          setBurials(mapped);
+        }
+      })
+      .catch(() => {
+        // Keep default historical sample burials
+      });
   }, [apiUrl]);
+
+  const [downloadingFolio, setDownloadingFolio] = useState<string | null>(null);
+
+  const handleDownloadPdf = (burial: any) => {
+    const folio = burial.folio || burial.pase_sepultacion_folio || `FOL-2026-${String(burial.id).padStart(4, "0")}`;
+    setDownloadingFolio(folio);
+
+    const params = new URLSearchParams({
+      fallecido: burial.nombre || "",
+      rut: burial.rut || "",
+      cementerio: burial.cementerio || "San Carlos",
+      ubicacion: burial.sector ? `${burial.sector}-${burial.fila}-${burial.numero}` : (burial.ubicacion_codigo || "N/A"),
+      tipo: "INHUMACION"
+    });
+
+    const downloadUrl = `${apiUrl}/api/v1/certificados/descargar/${encodeURIComponent(folio)}?${params.toString()}`;
+    window.open(downloadUrl, "_blank");
+
+    setTimeout(() => {
+      setDownloadingFolio(null);
+    }, 1500);
+  };
 
   // Form states for new burial
   const [formRut, setFormRut] = useState("");
@@ -447,12 +499,18 @@ export default function InhumacionesPage() {
                     </td>
                     <td className="p-3.5 sm:px-4 text-right">
                       <button 
-                        className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-xs font-medium hover:opacity-75 transition-all"
-                        style={{ borderColor: "var(--color-border)" }}
-                        title="Ver Permiso de Sepultación (PDF)"
+                        onClick={() => handleDownloadPdf(b)}
+                        disabled={downloadingFolio === (b.folio || `FOL-2026-${String(b.id).padStart(4, "0")}`)}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-xs font-semibold hover:opacity-80 transition-all cursor-pointer shadow-xs active:scale-95"
+                        style={{ 
+                          borderColor: "var(--color-border)",
+                          backgroundColor: downloadingFolio === (b.folio || `FOL-2026-${String(b.id).padStart(4, "0")}`) ? "var(--color-primary)" : "transparent",
+                          color: downloadingFolio === (b.folio || `FOL-2026-${String(b.id).padStart(4, "0")}`) ? "#FFFFFF" : "var(--color-text)"
+                        }}
+                        title="Ver / Descargar Permiso Oficial de Sepultación (PDF)"
                       >
-                        <FileText className="w-3.5 h-3.5 text-rose-500" />
-                        <span>PDF</span>
+                        <FileText className={`w-3.5 h-3.5 ${downloadingFolio === b.folio ? "animate-spin text-white" : "text-rose-500"}`} />
+                        <span>{downloadingFolio === b.folio ? "Generando..." : "PDF"}</span>
                       </button>
                     </td>
                   </tr>

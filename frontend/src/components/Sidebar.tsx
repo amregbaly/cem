@@ -164,21 +164,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <Link 
               href="/" 
               onClick={onClose}
-              className="flex items-center space-x-3 group"
+              className="flex items-center space-x-3 group min-w-0"
             >
-              <div 
-                className="w-11 h-11 rounded-xl flex items-center justify-center font-black text-white text-lg shadow-md transition-all group-hover:scale-105 group-hover:rotate-1"
-                style={{ 
-                  background: "linear-gradient(135deg, var(--color-primary), var(--color-secondary))" 
-                }}
-              >
-                SC
+              <div className="bg-white/95 dark:bg-slate-800/95 p-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs flex items-center justify-center shrink-0 transition-all group-hover:scale-105">
+                <img 
+                  src="/logo.png" 
+                  alt="Municipalidad de San Carlos" 
+                  className="h-8 w-auto max-w-[90px] object-contain"
+                />
               </div>
-              <div className="flex flex-col">
-                <span className="font-extrabold text-sm sm:text-base tracking-tight leading-tight uppercase">
+              <div className="flex flex-col min-w-0">
+                <span className="font-extrabold text-sm tracking-tight leading-tight uppercase truncate" style={{ color: "var(--color-text)" }}>
                   Cementerios
                 </span>
-                <span className="text-xs font-semibold opacity-75 tracking-normal">
+                <span className="text-xs font-semibold opacity-75 tracking-normal truncate">
                   San Carlos & Cachapoal
                 </span>
               </div>

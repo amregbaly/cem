@@ -55,11 +55,12 @@ export default function Navbar() {
             
             {/* Brand Logo & Name */}
             <div className="flex items-center space-x-3">
-              <div 
-                className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md font-bold text-white text-lg transition-transform hover:scale-105"
-                style={{ backgroundColor: "var(--color-primary)" }}
-              >
-                SC
+              <div className="bg-white/95 dark:bg-slate-800/95 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs flex items-center justify-center transition-transform hover:scale-105">
+                <img 
+                  src="/logo.png" 
+                  alt="Municipalidad de San Carlos" 
+                  className="h-8 w-auto max-w-[85px] object-contain"
+                />
               </div>
               <div>
                 <Link href="/" className="font-bold text-base sm:text-lg leading-tight block tracking-tight">

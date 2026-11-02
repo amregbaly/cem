@@ -220,10 +220,19 @@ export default function DashboardPage() {
           }}
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
-                <Building2 className="w-3.5 h-3.5" />
-                <span>Municipalidad de San Carlos & Cachapoal • Portal Oficial</span>
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="bg-white/95 dark:bg-slate-800/95 p-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs inline-flex">
+                  <img 
+                    src="/logo.png" 
+                    alt="Ilustre Municipalidad de San Carlos" 
+                    className="h-9 sm:h-10 w-auto object-contain"
+                  />
+                </div>
+                <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Portal Oficial • San Carlos & Cachapoal</span>
+                </div>
               </div>
               <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
                 {portalConfig.titulo_portal}

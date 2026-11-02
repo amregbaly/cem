@@ -25,14 +25,14 @@ export const DEFAULT_THEMES: ThemeConfig[] = [
     slug: "sancarlos-classic",
     es_modo_oscuro: false,
     es_sistema: true,
-    color_primario: "#1E3A8A",
-    color_secundario: "#2563EB",
-    color_acento: "#0D9488",
+    color_primario: "#AC115B",
+    color_secundario: "#0F7573",
+    color_acento: "#F8AC1A",
     color_fondo: "#F8FAFC",
     color_superficie: "#FFFFFF",
     color_texto: "#0F172A",
     color_borde: "#E2E8F0",
-    descripcion: "Tema oficial institucional diurno",
+    descripcion: "Tema oficial institucional Ilustre Municipalidad de San Carlos",
     border_radius: "0.75rem"
   },
   {
@@ -40,14 +40,14 @@ export const DEFAULT_THEMES: ThemeConfig[] = [
     slug: "sancarlos-night",
     es_modo_oscuro: true,
     es_sistema: true,
-    color_primario: "#3B82F6",
-    color_secundario: "#60A5FA",
-    color_acento: "#14B8A6",
+    color_primario: "#D81384",
+    color_secundario: "#1FB4B0",
+    color_acento: "#FFAE0B",
     color_fondo: "#0B0F19",
     color_superficie: "#111827",
     color_texto: "#F9FAFB",
     color_borde: "#1F2937",
-    descripcion: "Modo noche de alto descanso visual",
+    descripcion: "Modo noche institucional San Carlos de alto descanso visual",
     border_radius: "0.75rem"
   },
   {
@@ -160,7 +160,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (savedCustomThemes) {
       try {
         const parsed = JSON.parse(savedCustomThemes);
-        allThemes = [...DEFAULT_THEMES, ...parsed];
+        const customOnly = Array.isArray(parsed) ? parsed.filter((p: any) => !p.es_sistema && p.slug !== "sancarlos-classic" && p.slug !== "sancarlos-night") : [];
+        allThemes = [...DEFAULT_THEMES, ...customOnly];
         setAvailableThemes(allThemes);
       } catch (e) {
         console.error("Failed to parse custom themes", e);

@@ -418,10 +418,10 @@ export default function AdminTemasPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-xs"
-                  style={{ backgroundColor: "var(--color-primary)" }}
+                  className="h-8 px-1.5 py-0.5 rounded-lg flex items-center justify-center bg-white dark:bg-slate-800 border shadow-xs"
+                  style={{ borderColor: "var(--color-border)" }}
                 >
-                  SC
+                  <img src="/logo.png" alt="Logo" className="h-6 w-auto object-contain" />
                 </div>
                 <span className="font-bold text-sm" style={{ color: "var(--color-text)" }}>
                   Cementerio San Carlos
