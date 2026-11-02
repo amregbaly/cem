@@ -589,49 +589,71 @@ export default function DashboardPage() {
   // ==========================================
   return (
     <div className="space-y-8 animate-fadeIn">
-      {/* Header & Cemetery Switcher */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
-            {t("appSubtitle")}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {t("appTitle")} • San Carlos & Cachapoal • Sesión: {currentUser?.nombre_completo || currentUser?.username || "Funcionario"}
-          </p>
+      {/* Top Banner & Cemetery Switcher */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 sm:p-6 rounded-3xl border shadow-xs"
+        style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+      >
+        <div className="flex items-center space-x-3.5">
+          <div className="bg-white/95 dark:bg-slate-800/95 p-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs inline-flex shrink-0">
+            <img 
+              src="/logo.png" 
+              alt="Ilustre Municipalidad de San Carlos" 
+              className="h-9 sm:h-10 w-auto object-contain"
+            />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
+              {t("appSubtitle")}
+            </h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {t("appTitle")} • San Carlos & Cachapoal • Sesión: <span className="font-bold text-foreground">{currentUser?.nombre_completo || currentUser?.username || "Funcionario"}</span>
+            </p>
+          </div>
         </div>
 
-        {/* Cemetery Filter Pills */}
-        <div 
-          className="p-1 rounded-2xl border flex items-center self-start shadow-xs"
-          style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
-        >
-          <button
-            onClick={() => setSelectedCemetery("all")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              selectedCemetery === "all" ? "text-white shadow-xs" : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
-            }`}
-            style={{ backgroundColor: selectedCemetery === "all" ? "var(--color-primary)" : "transparent" }}
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/admin"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
           >
-            {t("allCemeteries")}
-          </button>
-          <button
-            onClick={() => setSelectedCemetery("sancarlos")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              selectedCemetery === "sancarlos" ? "text-white shadow-xs" : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
-            }`}
-            style={{ backgroundColor: selectedCemetery === "sancarlos" ? "var(--color-primary)" : "transparent" }}
+            <span>Módulos del Sistema</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+
+          {/* Cemetery Filter Pills */}
+          <div 
+            className="p-1 rounded-2xl border flex items-center shadow-xs"
+            style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
           >
-            San Carlos
-          </button>
-          <button
-            onClick={() => setSelectedCemetery("cachapoal")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              selectedCemetery === "cachapoal" ? "text-white shadow-xs" : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
-            }`}
-            style={{ backgroundColor: selectedCemetery === "cachapoal" ? "#059669" : "transparent" }}
-          >
-            Cachapoal
-          </button>
+            <button
+              onClick={() => setSelectedCemetery("all")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedCemetery === "all" ? "text-white shadow-xs" : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
+              }`}
+              style={{ backgroundColor: selectedCemetery === "all" ? "var(--color-primary)" : "transparent" }}
+            >
+              {t("allCemeteries")}
+            </button>
+            <button
+              onClick={() => setSelectedCemetery("sancarlos")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedCemetery === "sancarlos" ? "text-white shadow-xs" : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
+              }`}
+              style={{ backgroundColor: selectedCemetery === "sancarlos" ? "var(--color-primary)" : "transparent" }}
+            >
+              San Carlos
+            </button>
+            <button
+              onClick={() => setSelectedCemetery("cachapoal")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedCemetery === "cachapoal" ? "text-white shadow-xs" : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
+              }`}
+              style={{ backgroundColor: selectedCemetery === "cachapoal" ? "#059669" : "transparent" }}
+            >
+              Cachapoal
+            </button>
+          </div>
         </div>
       </div>
 

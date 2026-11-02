@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import TopHeader from "./TopHeader";
 import ChatPanel from "./ChatPanel";
@@ -11,24 +12,30 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const isHomePage = pathname === "/";
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--color-bg)] text-[var(--color-text)] transition-colors">
       
-      {/* Left-side Navigation Sidebar */}
-      <Sidebar 
-        isOpen={mobileMenuOpen} 
-        onClose={() => setMobileMenuOpen(false)} 
-      />
+      {/* Left-side Navigation Sidebar (Hidden on Home Page) */}
+      {!isHomePage && (
+        <Sidebar 
+          isOpen={mobileMenuOpen} 
+          onClose={() => setMobileMenuOpen(false)} 
+        />
+      )}
 
-      {/* Main Content Area (Offset by sidebar width on desktop) */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-72 transition-all">
+      {/* Main Content Area (Offset by sidebar width on desktop only when sidebar is visible) */}
+      <div className={`flex-1 flex flex-col min-w-0 transition-all ${!isHomePage ? "lg:pl-72" : ""}`}>
         
-        {/* Top Header Bar */}
-        <TopHeader onOpenMobileMenu={() => setMobileMenuOpen(true)} />
+        {/* Top Header Bar (Hidden on Home Page) */}
+        {!isHomePage && (
+          <TopHeader onOpenMobileMenu={() => setMobileMenuOpen(true)} />
+        )}
 
         {/* Dynamic Page Content */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <main className={`flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${isHomePage ? "max-w-6xl" : "max-w-7xl"}`}>
           {children}
         </main>
 
