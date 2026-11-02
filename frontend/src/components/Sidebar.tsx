@@ -70,13 +70,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       .catch(() => {});
 
     window.addEventListener("storage", readUser);
-    return () => window.removeEventListener("storage", readUser);
+    window.addEventListener("cem_auth_change", readUser);
+    return () => {
+      window.removeEventListener("storage", readUser);
+      window.removeEventListener("cem_auth_change", readUser);
+    };
   }, [pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("cem_auth_token");
     localStorage.removeItem("cem_auth_user");
     setCurrentUser(null);
+    window.dispatchEvent(new Event("cem_auth_change"));
+    window.dispatchEvent(new Event("storage"));
     window.location.reload();
   };
 

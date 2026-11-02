@@ -57,3 +57,17 @@ class UsuarioResponse(BaseModel):
     ultimo_acceso: Optional[str] = None
 
 
+class UsuarioUpdateRequest(BaseModel):
+    nombre_completo: Optional[str] = None
+    email: Optional[str] = None
+    rut: Optional[str] = None
+    rol: Optional[str] = None
+    grupo_id: Optional[int] = None
+    activo: Optional[bool] = None
+
+
+class AdminChangePasswordRequest(BaseModel):
+    new_password: str
+
+
+

@@ -101,7 +101,11 @@ export default function DashboardPage() {
       .catch(() => {});
 
     window.addEventListener("storage", readUser);
-    return () => window.removeEventListener("storage", readUser);
+    window.addEventListener("cem_auth_change", readUser);
+    return () => {
+      window.removeEventListener("storage", readUser);
+      window.removeEventListener("cem_auth_change", readUser);
+    };
   }, [apiUrl]);
 
   const handleVerifyCertificate = async (folioToTest?: string) => {

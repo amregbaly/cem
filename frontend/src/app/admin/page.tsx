@@ -196,6 +196,27 @@ export default function AdminPage() {
   const [selectedTargetGroupId, setSelectedTargetGroupId] = useState<number | "">("");
   const [assignLoading, setAssignLoading] = useState(false);
 
+  // Edit User Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<Usuario | null>(null);
+  const [editNombre, setEditNombre] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editRut, setEditRut] = useState("");
+  const [editRol, setEditRol] = useState("ADMINISTRATIVO");
+  const [editGrupoId, setEditGrupoId] = useState<number | "">("");
+  const [editActivo, setEditActivo] = useState(true);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Admin Change Password Modal
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState<Usuario | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
   // Action status message
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -224,6 +245,8 @@ export default function AdminPage() {
         setShowCreateModal(false);
         setShowGroupModal(false);
         setShowAssignModal(false);
+        setShowEditModal(false);
+        setShowPasswordModal(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -258,6 +281,8 @@ export default function AdminPage() {
       setCurrentUser(userObj);
       localStorage.setItem("cem_auth_token", data.access_token);
       localStorage.setItem("cem_auth_user", JSON.stringify(userObj));
+      window.dispatchEvent(new Event("cem_auth_change"));
+      window.dispatchEvent(new Event("storage"));
 
       fetchUsuarios(data.access_token);
       fetchGrupos(data.access_token);
@@ -275,6 +300,8 @@ export default function AdminPage() {
     setRoleError(null);
     localStorage.removeItem("cem_auth_token");
     localStorage.removeItem("cem_auth_user");
+    window.dispatchEvent(new Event("cem_auth_change"));
+    window.dispatchEvent(new Event("storage"));
     setUsuarios([]);
     setGrupos([]);
   };
@@ -463,6 +490,117 @@ export default function AdminPage() {
       setCreateError(err.message || "Error al procesar la solicitud.");
     } finally {
       setCreateLoading(false);
+    }
+  };
+
+  const handleOpenEditModal = (u: Usuario) => {
+    setSelectedUserForEdit(u);
+    setEditNombre(u.nombre_completo);
+    setEditEmail(u.email || "");
+    setEditRut(u.rut || "");
+    setEditRol(u.rol);
+    setEditGrupoId(u.grupo_id || "");
+    setEditActivo(u.activo);
+    setEditError(null);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForEdit) return;
+
+    setEditLoading(true);
+    setEditError(null);
+
+    try {
+      const authToken = token || localStorage.getItem("cem_auth_token");
+      const res = await fetch(`${apiUrl}/api/v1/auth/usuarios/${selectedUserForEdit.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          nombre_completo: editNombre.trim(),
+          email: editEmail.trim() || null,
+          rut: editRut.trim() || null,
+          rol: editRol,
+          grupo_id: editGrupoId === "" ? 0 : Number(editGrupoId),
+          activo: editActivo,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Error al actualizar funcionario.");
+      }
+
+      setActionMessage(`Funcionario '${data.nombre_completo}' actualizado correctamente.`);
+      setTimeout(() => setActionMessage(null), 4000);
+      setShowEditModal(false);
+      if (authToken) {
+        fetchUsuarios(authToken);
+        fetchGrupos(authToken);
+      }
+    } catch (err: any) {
+      setEditError(err.message || "Error al procesar la actualización.");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleOpenPasswordModal = (u: Usuario) => {
+    setSelectedUserForPassword(u);
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordError(null);
+    setShowPasswordModal(true);
+  };
+
+  const handleAdminChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForPassword) return;
+
+    if (newPassword.length < 12) {
+      setPasswordError("La contraseña debe tener al menos 12 caracteres (Ley 21.719 / ASVS L2).");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Las contraseñas ingresadas no coinciden.");
+      return;
+    }
+
+    setPasswordLoading(true);
+    setPasswordError(null);
+
+    try {
+      const authToken = token || localStorage.getItem("cem_auth_token");
+      const res = await fetch(`${apiUrl}/api/v1/auth/usuarios/${selectedUserForPassword.id}/password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          new_password: newPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Error al cambiar la contraseña.");
+      }
+
+      setActionMessage(`Contraseña actualizada exitosamente para '${selectedUserForPassword.username}'.`);
+      setTimeout(() => setActionMessage(null), 4000);
+      setShowPasswordModal(false);
+      if (authToken) {
+        fetchUsuarios(authToken);
+      }
+    } catch (err: any) {
+      setPasswordError(err.message || "Error al cambiar contraseña.");
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -807,6 +945,7 @@ export default function AdminPage() {
             <div>
               <label className="block text-xs font-semibold mb-1 opacity-80">Usuario</label>
               <input
+                id="input-login-username"
                 type="text"
                 value={loginUsername}
                 onChange={(e) => setLoginUsername(e.target.value)}
@@ -820,6 +959,7 @@ export default function AdminPage() {
             <div>
               <label className="block text-xs font-semibold mb-1 opacity-80">Contraseña</label>
               <input
+                id="input-login-password"
                 type="password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
@@ -831,6 +971,7 @@ export default function AdminPage() {
               />
             </div>
             <button
+              id="btn-login-submit"
               type="submit"
               disabled={loginLoading}
               className="w-full py-3 rounded-xl font-bold text-sm text-white shadow transition-all disabled:opacity-50 flex items-center justify-center space-x-2 hover:opacity-90"
@@ -847,6 +988,7 @@ export default function AdminPage() {
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                 <button
+                  id="btn-quick-login-admin"
                   type="button"
                   onClick={() => handleLogin("admin", "AdminCem2026!")}
                   className="p-3 rounded-xl border text-xs font-medium bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 transition-all text-left shadow-2xs"
@@ -857,6 +999,7 @@ export default function AdminPage() {
                   <div className="text-[11px] opacity-75 mt-0.5">Carlos Aránguiz (Total)</div>
                 </button>
                 <button
+                  id="btn-quick-login-operador"
                   type="button"
                   onClick={() => handleLogin("operador", "OperadorCem2026!")}
                   className="p-3 rounded-xl border text-xs font-medium bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 transition-all text-left shadow-2xs"
@@ -926,6 +1069,7 @@ export default function AdminPage() {
               </button>
 
               <button
+                id="btn-admin-logout"
                 onClick={handleLogout}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 border-red-200 transition-all"
               >
@@ -1220,18 +1364,39 @@ export default function AdminPage() {
                                   </button>
                                 )}
                                 {currentUser?.role === "ADMINISTRADOR" && (
-                                  <button
-                                    onClick={() => {
-                                      setSelectedUserForAssign(u);
-                                      setSelectedTargetGroupId(u.grupo_id || "");
-                                      setShowAssignModal(true);
-                                    }}
-                                    className="p-1.5 rounded-lg border hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium"
-                                    title="Cambiar grupo asignado"
-                                    style={{ borderColor: "var(--color-border)" }}
-                                  >
-                                    <Layers className="w-3.5 h-3.5 text-primary" />
-                                  </button>
+                                  <>
+                                    <button
+                                      id={`btn-edit-user-${u.id}`}
+                                      onClick={() => handleOpenEditModal(u)}
+                                      className="p-1.5 rounded-lg border hover:bg-blue-50 dark:hover:bg-blue-950/40 text-blue-600 dark:text-blue-400 transition-colors"
+                                      title="Editar funcionario"
+                                      style={{ borderColor: "var(--color-border)" }}
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      id={`btn-password-user-${u.id}`}
+                                      onClick={() => handleOpenPasswordModal(u)}
+                                      className="p-1.5 rounded-lg border hover:bg-amber-50 dark:hover:bg-amber-950/40 text-amber-600 dark:text-amber-400 transition-colors"
+                                      title="Cambiar contraseña"
+                                      style={{ borderColor: "var(--color-border)" }}
+                                    >
+                                      <Key className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      id={`btn-assign-group-${u.id}`}
+                                      onClick={() => {
+                                        setSelectedUserForAssign(u);
+                                        setSelectedTargetGroupId(u.grupo_id || "");
+                                        setShowAssignModal(true);
+                                      }}
+                                      className="p-1.5 rounded-lg border hover:bg-slate-100 dark:hover:bg-slate-800 text-primary transition-colors"
+                                      title="Cambiar grupo asignado"
+                                      style={{ borderColor: "var(--color-border)" }}
+                                    >
+                                      <Layers className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             </td>
@@ -2191,6 +2356,312 @@ export default function AdminPage() {
                 {assignLoading ? "Asignando..." : "Confirmar Asignación"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Funcionario */}
+      {showEditModal && selectedUserForEdit && (
+        <div 
+          id="modal-edit-user-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowEditModal(false); }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+        >
+          <div
+            id="modal-edit-user-dialog"
+            className="w-full max-w-lg rounded-2xl border shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+            style={{
+              backgroundColor: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+            }}
+          >
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--color-border)" }}>
+              <div className="flex items-center space-x-2">
+                <Edit3 className="w-5 h-5 text-blue-600" />
+                <h3 className="text-lg font-bold">Editar Funcionario Municipal</h3>
+              </div>
+              <button
+                id="btn-close-edit-user"
+                onClick={() => setShowEditModal(false)}
+                className="text-xs font-bold p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{editError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateUser} className="space-y-4 text-sm">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border text-xs flex items-center justify-between" style={{ borderColor: "var(--color-border)" }}>
+                <div>
+                  <span className="opacity-70">Nombre de Usuario (inmutable):</span>{" "}
+                  <code className="font-mono font-bold text-primary">{selectedUserForEdit.username}</code>
+                </div>
+                <div className="text-[11px] opacity-60">ID #{selectedUserForEdit.id}</div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 opacity-80">
+                  Nombre Completo *
+                </label>
+                <input
+                  id="input-edit-nombre"
+                  type="text"
+                  required
+                  value={editNombre}
+                  onChange={(e) => setEditNombre(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{
+                    backgroundColor: "var(--color-bg)",
+                    borderColor: "var(--color-border)",
+                  }}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 opacity-80">
+                    Correo Institucional
+                  </label>
+                  <input
+                    id="input-edit-email"
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                    style={{
+                      backgroundColor: "var(--color-bg)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-1 opacity-80">
+                    RUT Chileno (con DV)
+                  </label>
+                  <input
+                    id="input-edit-rut"
+                    type="text"
+                    value={editRut}
+                    onChange={(e) => setEditRut(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                    style={{
+                      backgroundColor: "var(--color-bg)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 opacity-80">
+                    Rol del Sistema *
+                  </label>
+                  <select
+                    id="select-edit-rol"
+                    value={editRol}
+                    onChange={(e) => setEditRol(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border outline-none text-xs font-semibold"
+                    style={{
+                      backgroundColor: "var(--color-bg)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <option value="ADMINISTRATIVO">Administrativo</option>
+                    <option value="ADMINISTRADOR">Administrador</option>
+                    <option value="VISITA">Visita / Consulta</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-1 opacity-80">
+                    Grupo Funcional (RBAC)
+                  </label>
+                  <select
+                    id="select-edit-grupo"
+                    value={editGrupoId}
+                    onChange={(e) => setEditGrupoId(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border outline-none text-xs"
+                    style={{
+                      backgroundColor: "var(--color-bg)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <option value="">(Sin Grupo Asignado)</option>
+                    {grupos.map((g) => (
+                      <option key={g.id} value={g.id}>{g.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <label className="flex items-center space-x-2.5 cursor-pointer">
+                  <input
+                    id="checkbox-edit-activo"
+                    type="checkbox"
+                    checked={editActivo}
+                    onChange={(e) => setEditActivo(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <div>
+                    <span className="text-xs font-bold">Cuenta de Funcionario Activa</span>
+                    <p className="text-[11px] opacity-60">Si se desmarca, el usuario no podrá iniciar sesión en la plataforma.</p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t" style={{ borderColor: "var(--color-border)" }}>
+                <button
+                  type="button"
+                  id="btn-cancel-edit-user"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 rounded-xl border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  style={{ borderColor: "var(--color-border)" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  id="btn-submit-edit-user"
+                  type="submit"
+                  disabled={editLoading}
+                  className="flex items-center space-x-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white shadow transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                  style={{ backgroundColor: "var(--color-primary)" }}
+                >
+                  {editLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>{editLoading ? "Guardando..." : "Guardar Cambios"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Cambiar Contraseña de Funcionario */}
+      {showPasswordModal && selectedUserForPassword && (
+        <div 
+          id="modal-password-user-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowPasswordModal(false); }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+        >
+          <div
+            id="modal-password-user-dialog"
+            className="w-full max-w-md rounded-2xl border shadow-2xl p-6 space-y-5"
+            style={{
+              backgroundColor: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+            }}
+          >
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--color-border)" }}>
+              <div className="flex items-center space-x-2">
+                <Key className="w-5 h-5 text-amber-500" />
+                <h3 className="text-base font-bold">Cambiar Contraseña</h3>
+              </div>
+              <button
+                id="btn-close-password-user"
+                onClick={() => setShowPasswordModal(false)}
+                className="text-xs font-bold p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border text-xs space-y-1" style={{ borderColor: "var(--color-border)" }}>
+              <div className="font-bold text-sm">{selectedUserForPassword.nombre_completo}</div>
+              <div className="opacity-75">
+                Usuario: <code className="font-mono text-primary font-bold">{selectedUserForPassword.username}</code> • Rol: {selectedUserForPassword.rol}
+              </div>
+            </div>
+
+            {passwordError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAdminChangePassword} className="space-y-4 text-sm">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold opacity-80">
+                    Nueva Contraseña *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="text-[11px] text-blue-600 hover:underline flex items-center space-x-1"
+                  >
+                    {showNewPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    <span>{showNewPassword ? "Ocultar" : "Mostrar"}</span>
+                  </button>
+                </div>
+                <input
+                  id="input-new-password"
+                  type={showNewPassword ? "text" : "password"}
+                  required
+                  minLength={12}
+                  placeholder="Mínimo 12 caracteres (ej: ClaveSegura2026!)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                  style={{
+                    backgroundColor: "var(--color-bg)",
+                    borderColor: "var(--color-border)",
+                  }}
+                />
+                <p className="text-[11px] opacity-60 mt-1">
+                  Requisito Ley 21.719 y ASVS L2: Al menos 12 caracteres alfanuméricos.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 opacity-80">
+                  Confirmar Nueva Contraseña *
+                </label>
+                <input
+                  id="input-confirm-password"
+                  type={showNewPassword ? "text" : "password"}
+                  required
+                  minLength={12}
+                  placeholder="Repita la nueva contraseña"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                  style={{
+                    backgroundColor: "var(--color-bg)",
+                    borderColor: "var(--color-border)",
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t" style={{ borderColor: "var(--color-border)" }}>
+                <button
+                  type="button"
+                  id="btn-cancel-password-user"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="px-4 py-2 rounded-xl border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  style={{ borderColor: "var(--color-border)" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  id="btn-submit-change-password"
+                  type="submit"
+                  disabled={passwordLoading || !newPassword}
+                  className="flex items-center space-x-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white shadow bg-amber-600 hover:bg-amber-700 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                >
+                  {passwordLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                  <span>{passwordLoading ? "Actualizando..." : "Actualizar Contraseña"}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

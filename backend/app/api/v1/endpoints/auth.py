@@ -6,7 +6,8 @@ from app.infrastructure.db.session import get_db
 from app.domain.models import Usuario, RolUsuario
 from app.domain.schemas.auth import (
     Token, LoginRequest, TOTPSetupResponse, TOTPVerifyRequest,
-    UsuarioCreateRequest, UsuarioResponse
+    UsuarioCreateRequest, UsuarioResponse, UsuarioUpdateRequest,
+    AdminChangePasswordRequest
 )
 from etl.rut_validator import validate_and_format_rut
 from app.core.security import (
@@ -405,6 +406,170 @@ def crear_usuario(
         bloqueado_hasta=new_user.bloqueado_hasta.isoformat() if new_user.bloqueado_hasta else None,
         ultimo_acceso=new_user.ultimo_acceso.isoformat() if new_user.ultimo_acceso else None
     )
+
+
+@router.put("/usuarios/{usuario_id}", response_model=UsuarioResponse)
+@router.patch("/usuarios/{usuario_id}", response_model=UsuarioResponse)
+def actualizar_usuario(
+    usuario_id: int,
+    req: UsuarioUpdateRequest,
+    current_user: Usuario = Depends(require_role([RolUsuario.ADMINISTRADOR.value])),
+    db: Session = Depends(get_db)
+):
+    """
+    Update an existing user account:
+    - Allows updating full name, email, RUT (with Modulo 11 validation), role, group, and active status.
+    - Prevents duplicate email if email is modified.
+    - Generates immutable cryptographic audit log (HMAC SHA-256).
+    """
+    target = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    payload_anterior = {
+        "id": target.id,
+        "username": target.username,
+        "nombre_completo": target.nombre_completo,
+        "email": target.email,
+        "rut": target.rut,
+        "rol": target.rol,
+        "grupo_id": target.grupo_id,
+        "activo": target.activo,
+    }
+
+    if req.nombre_completo is not None:
+        target.nombre_completo = req.nombre_completo.strip()
+
+    if req.email is not None:
+        clean_email = req.email.strip() if req.email else None
+        if clean_email and clean_email != target.email:
+            existing_email = db.query(Usuario).filter(Usuario.email == clean_email, Usuario.id != usuario_id).first()
+            if existing_email:
+                raise HTTPException(status_code=400, detail=f"El correo electrónico '{clean_email}' ya está registrado.")
+        target.email = clean_email
+
+    if req.rut is not None:
+        if req.rut.strip():
+            is_valid_rut, formatted_rut, _, _ = validate_and_format_rut(req.rut)
+            if not is_valid_rut:
+                raise HTTPException(status_code=400, detail="RUT inválido. Debe cumplir con el algoritmo chileno Módulo 11 (ej: 12345678-5).")
+            target.rut = formatted_rut
+        else:
+            target.rut = None
+
+    if req.rol is not None:
+        role_val = req.rol.upper()
+        valid_roles = [r.value for r in RolUsuario]
+        if role_val not in valid_roles:
+            raise HTTPException(status_code=400, detail=f"Rol inválido. Roles válidos: {', '.join(valid_roles)}")
+        target.rol = role_val
+
+    if req.grupo_id is not None:
+        if req.grupo_id == 0 or req.grupo_id == -1:
+            target.grupo_id = None
+        else:
+            from app.domain.models.grupo import Grupo
+            grupo = db.query(Grupo).filter(Grupo.id == req.grupo_id).first()
+            if not grupo:
+                raise HTTPException(status_code=404, detail="El grupo seleccionado no existe.")
+            target.grupo_id = req.grupo_id
+
+    if req.activo is not None:
+        target.activo = req.activo
+
+    db.commit()
+    db.refresh(target)
+
+    grupo_nombre = target.grupo.nombre if target.grupo else None
+
+    AuditService.log_mutation(
+        session=db,
+        modulo="SEGURIDAD",
+        accion="EDITAR_USUARIO",
+        entidad="core.tb_usuario",
+        registro_id=str(target.id),
+        payload_anterior=payload_anterior,
+        payload_posterior={
+            "id": target.id,
+            "username": target.username,
+            "nombre_completo": target.nombre_completo,
+            "email": target.email,
+            "rut": target.rut,
+            "rol": target.rol,
+            "grupo_id": target.grupo_id,
+            "activo": target.activo,
+        },
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
+        commit=True
+    )
+
+    return UsuarioResponse(
+        id=target.id,
+        username=target.username,
+        email=target.email,
+        rut=target.rut,
+        nombre_completo=target.nombre_completo,
+        rol=target.rol,
+        grupo_id=target.grupo_id,
+        grupo_nombre=grupo_nombre,
+        activo=target.activo,
+        totp_enabled=target.totp_enabled,
+        intentos_fallidos=target.intentos_fallidos,
+        bloqueado_hasta=target.bloqueado_hasta.isoformat() if target.bloqueado_hasta else None,
+        ultimo_acceso=target.ultimo_acceso.isoformat() if target.ultimo_acceso else None
+    )
+
+
+@router.post("/usuarios/{usuario_id}/password")
+def cambiar_password_usuario(
+    usuario_id: int,
+    req: AdminChangePasswordRequest,
+    current_user: Usuario = Depends(require_role([RolUsuario.ADMINISTRADOR.value])),
+    db: Session = Depends(get_db)
+):
+    """
+    Administrative password reset or change for any user:
+    - Enforces password policy (min 12 chars, complexity, breach checks).
+    - Clears failed login attempts and unlocks account if locked.
+    - Updates hash and logs cryptographic audit record.
+    """
+    target = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_valid_pw, pw_msg = validate_password_policy(req.new_password)
+    if not is_valid_pw:
+        raise HTTPException(status_code=400, detail=pw_msg)
+
+    target.hashed_password = get_password_hash(req.new_password)
+    target.intentos_fallidos = 0
+    target.bloqueado_hasta = None
+    target.ultimo_cambio_clave = datetime.now(timezone.utc)
+    db.commit()
+
+    AuditService.log_mutation(
+        session=db,
+        modulo="SEGURIDAD",
+        accion="CAMBIO_PASSWORD_ADMIN",
+        entidad="core.tb_usuario",
+        registro_id=str(target.id),
+        payload_posterior={
+            "usuario_afectado": target.username,
+            "cambiado_por": current_user.username,
+            "motivo": "Reseteo administrativo de credenciales"
+        },
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
+        commit=True
+    )
+
+    return {"message": f"Contraseña actualizada exitosamente para el usuario {target.username}."}
+
 
 
 
