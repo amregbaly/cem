@@ -39,10 +39,13 @@ class MaestroResponse(BaseModel):
 class TrabajoMaestroCreate(BaseModel):
     orden_ingreso: str = Field(..., description="Número de Orden de Ingreso Municipal")
     maestro_id: int
-    ubicacion_id: int
+    ubicacion_id: Optional[int] = None
+    codigo_ubicacion: Optional[str] = None
+    cementerio_id: Optional[int] = None
     fecha_orden: date = Field(default_factory=date.today)
     tipo_trabajo: int = Field(1, description="1: Colocación de Lápida, 2: Construcción/Reparación, 3: Mantención")
     observaciones: Optional[str] = None
+
 
 
 class TrabajoMaestroResponse(BaseModel):
@@ -166,9 +169,26 @@ def create_orden_maestro(
     Registers a mason work order (tombstone placement, repair, maintenance).
     Links to income order number (orden_de_ingreso) and appends to property historical dossier.
     """
-    ubic = db.query(Ubicacion).filter(Ubicacion.id == req.ubicacion_id).first()
+    ubic = None
+    if req.ubicacion_id:
+        ubic = db.query(Ubicacion).filter(Ubicacion.id == req.ubicacion_id).first()
+    elif req.codigo_ubicacion:
+        clean_code = req.codigo_ubicacion.strip().upper()
+        c_query = db.query(Ubicacion)
+        if req.cementerio_id:
+            c_query = c_query.filter(Ubicacion.cementerio_id == req.cementerio_id)
+        candidates = c_query.all()
+        for c in candidates:
+            if c.codigo_completo.upper() == clean_code:
+                ubic = c
+                break
+
     if not ubic:
-        raise HTTPException(status_code=404, detail="Ubicación de sepultura no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Ubicación de sepultura no encontrada con ID {req.ubicacion_id} o código '{req.codigo_ubicacion}'."
+        )
+
 
     maestro = db.query(Maestro).filter(Maestro.id == req.maestro_id).first()
     if not maestro:

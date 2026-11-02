@@ -68,6 +68,8 @@ frontend/.env.production.local
 postgres_data/
 backups/
 backend/backups/automated/
+*.db
+
 
 # ==========================================
 # OS generated files

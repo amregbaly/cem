@@ -617,3 +617,53 @@ def deshabilitar_ubicacion(
         "ubicacion": ubic.to_dict()
     }
 
+
+@router.patch("/{ubicacion_id}/habilitar")
+def habilitar_ubicacion(
+    ubicacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+):
+    """
+    Re-enables a previously disabled location (EETT 3.1).
+    Restores active status and recalculates state based on occupancy.
+    """
+    ubic = db.query(Ubicacion).filter(Ubicacion.id == ubicacion_id).first()
+    if not ubic:
+        raise HTTPException(status_code=404, detail="Ubicación no encontrada.")
+
+    ubic.activo = True
+    ubic.motivo_deshabilitacion = None
+    if ubic.capacidad_ocupada >= ubic.capacidad_total:
+        ubic.estado = EstadoUbicacion.OCUPADO.value
+    else:
+        ubic.estado = EstadoUbicacion.DISPONIBLE.value
+
+    ubic.observaciones = f"{ubic.observaciones or ''} | [REHABILITADO {date.today()}]".strip(" |")
+
+    AuditService.log_mutation(
+        session=db,
+        modulo="UBICACIONES",
+        accion="HABILITAR_UBICACION",
+        entidad="core.tb_ubicacion",
+        registro_id=str(ubic.id),
+        payload_posterior={
+            "id": ubic.id,
+            "codigo_completo": ubic.codigo_completo,
+            "activo": True,
+            "estado": ubic.estado
+        },
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
+        commit=True
+    )
+
+    return {
+        "success": True,
+        "message": f"Ubicación {ubic.codigo_completo} rehabilitada exitosamente.",
+        "ubicacion": ubic.to_dict()
+    }
+
+

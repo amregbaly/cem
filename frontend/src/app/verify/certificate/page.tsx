@@ -86,10 +86,23 @@ export default function CertificatePortalPage() {
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Inicio</span>
         </Link>
-        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-          Ley 21.719 • Verificación Oficial
-        </span>
+        <div className="flex items-center space-x-2.5">
+          <a
+            href={`${apiUrl}/api/v1/certificados/exportar`}
+            download
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+            title="Descargar Nómina de Certificados Emitidos en CSV"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Exportar Nómina CSV</span>
+          </a>
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            Ley 21.719 • Verificación Oficial
+          </span>
+        </div>
       </div>
+
 
       {/* Main Hero Header */}
       <div className="text-center space-y-3">

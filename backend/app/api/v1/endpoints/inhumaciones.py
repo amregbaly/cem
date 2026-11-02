@@ -1,6 +1,9 @@
+import io
+import csv
 from typing import List, Optional
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from app.infrastructure.db.session import get_db
 from app.domain.models import Inhumacion, Ubicacion, Persona, Usuario, RolUsuario, ConfigPortal
@@ -73,6 +76,56 @@ def list_inhumaciones(
             observaciones=inh.observaciones
         ))
     return response
+
+
+@router.get("/exportar")
+def exportar_libro_inhumaciones(
+    cementerio_id: Optional[int] = Query(None),
+    formato: str = Query("csv", description="Formato: csv"),
+    db: Session = Depends(get_db),
+    user: Optional[Usuario] = Depends(get_current_user_optional)
+):
+    """
+    Exports official municipal burial ledger in CSV with UTF-8 BOM encoding.
+    Complies with Ley 21.719 data protection principles.
+    """
+    is_staff = user and user.rol in {RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value}
+    query = db.query(Inhumacion).join(Inhumacion.fallecido).join(Inhumacion.ubicacion)
+
+    if cementerio_id:
+        query = query.filter(Ubicacion.cementerio_id == cementerio_id)
+
+    records = query.order_by(Inhumacion.fecha_sepultacion.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow([
+        "NUM_INGRESO", "FALLECIDO_NOMBRE", "FALLECIDO_RUT", "FECHA_DEFUNCION",
+        "FECHA_SEPULTACION", "CEMENTERIO", "CODIGO_SEPULTURA", "PASE_SEPULTACION_FOLIO",
+        "RESPONSABLE", "OBSERVACIONES"
+    ])
+
+    for inh in records:
+        writer.writerow([
+            inh.numero_ingreso or "",
+            inh.fallecido.nombre_completo if inh.fallecido else "",
+            inh.fallecido.rut if inh.fallecido else "",
+            inh.fecha_defuncion.isoformat() if inh.fecha_defuncion else "",
+            inh.fecha_sepultacion.isoformat() if inh.fecha_sepultacion else "",
+            inh.ubicacion.cementerio.nombre if inh.ubicacion and inh.ubicacion.cementerio else "San Carlos",
+            inh.ubicacion.codigo_completo if inh.ubicacion else "",
+            inh.pase_sepultacion_folio or "",
+            inh.responsable_nombre if is_staff else "[PROTEGIDO LEY 21.719]",
+            inh.observaciones or ""
+        ])
+
+    output.seek(0)
+    today_str = date.today().isoformat()
+    return Response(
+        content=output.getvalue().encode("utf-8-sig"),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="libro_inhumaciones_{today_str}.csv"'}
+    )
 
 
 @router.get("/{id}", response_model=InhumacionResponse)

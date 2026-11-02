@@ -86,12 +86,30 @@ def create_reserva(
     - Expiry date must be >= reservation date.
     - Sets location state to RESERVADO.
     """
-    ubic = db.query(Ubicacion).filter(Ubicacion.id == req.ubicacion_id).first()
+    ubic = None
+    if req.ubicacion_id:
+        ubic = db.query(Ubicacion).filter(Ubicacion.id == req.ubicacion_id).first()
+    elif req.codigo_ubicacion:
+        clean_code = req.codigo_ubicacion.strip().upper()
+        # Search candidate locations
+        c_query = db.query(Ubicacion)
+        if req.cementerio_id:
+            c_query = c_query.filter(Ubicacion.cementerio_id == req.cementerio_id)
+        candidates = c_query.all()
+        for c in candidates:
+            if c.codigo_completo.upper() == clean_code:
+                ubic = c
+                break
+
     if not ubic:
-        raise HTTPException(status_code=404, detail="Ubicación no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Ubicación no encontrada con ID {req.ubicacion_id} o código '{req.codigo_ubicacion}'."
+        )
 
     if not ubic.activo:
         raise HTTPException(status_code=400, detail="No se puede reservar una ubicación deshabilitada.")
+
 
     # Rule: Never available while an active burial or lease exists
     active_burial = db.query(Inhumacion).filter(Inhumacion.ubicacion_id == ubic.id).first()

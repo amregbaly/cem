@@ -4,7 +4,9 @@ from pydantic import BaseModel, ConfigDict
 
 
 class ReservaCreate(BaseModel):
-    ubicacion_id: int
+    ubicacion_id: Optional[int] = None
+    codigo_ubicacion: Optional[str] = None
+    cementerio_id: Optional[int] = None
     solicitante_nombre: str
     solicitante_rut: Optional[str] = None
     solicitante_telefono: Optional[str] = None
@@ -13,6 +15,7 @@ class ReservaCreate(BaseModel):
     fecha_vencimiento: date
     documento_respaldo_url: Optional[str] = None
     observaciones: Optional[str] = None
+
 
 
 class ReservaLiberarRequest(BaseModel):

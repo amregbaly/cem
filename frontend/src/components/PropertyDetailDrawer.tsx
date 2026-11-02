@@ -16,7 +16,8 @@ import {
   Download,
   Share2,
   HardHat,
-  ArrowRight
+  ArrowRight,
+  Ban
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -72,6 +73,10 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
   const [activeTab, setActiveTab] = useState<"dossier" | "timeline" | "acciones">("dossier");
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [isEmitting, setIsEmitting] = useState<boolean>(false);
+  const [showDisableDialog, setShowDisableDialog] = useState<boolean>(false);
+  const [disableReason, setDisableReason] = useState<string>("");
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
+
 
   useEffect(() => {
     if (!slot || !isOpen) return;
@@ -178,21 +183,62 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-
-      if (!res.ok) throw new Error("Fallo al emitir certificado");
-      const data = await res.json();
-
-      // Trigger automatic PDF download
-      window.open(`${apiUrl}/api/v1/certificados/descargar/${data.folio}`, "_blank");
-      setActionSuccess(`Certificado oficial folio ${data.folio} emitido con éxito. Descarga iniciada.`);
-    } catch (e: any) {
-      setActionSuccess(`Certificado generado en borrador municipal para ${slot.codigo_completo}.`);
+      if (!res.ok) throw new Error("Error al emitir certificado");
+      const certData = await res.json();
+      setActionSuccess(`Certificado ${certData.folio} emitido con éxito. Descarga iniciada.`);
+      if (onEmitCertificate) onEmitCertificate(slot);
+      window.open(`${apiUrl}/api/v1/certificados/${certData.id}/descargar`, "_blank");
+    } catch {
+      setActionSuccess("No se pudo emitir el certificado. Verifique permisos.");
     } finally {
       setIsEmitting(false);
     }
   };
 
+  const handleDeshabilitar = async () => {
+    if (!disableReason.trim()) return;
+    setIsUpdatingStatus(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${apiUrl}/api/v1/ubicaciones/${slot.id}/deshabilitar`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo: disableReason.trim() })
+      });
+      if (!res.ok) throw new Error("Error al deshabilitar");
+      slot.estado = "BLOQUEADO";
+      slot.color_status = "BLOQUEADO";
+      setShowDisableDialog(false);
+      setDisableReason("");
+      setActionSuccess(`Sepultura ${slot.codigo_completo} deshabilitada correctamente. Historial intacto.`);
+    } catch {
+      setActionSuccess("Error al deshabilitar la ubicación.");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleHabilitar = async () => {
+    setIsUpdatingStatus(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${apiUrl}/api/v1/ubicaciones/${slot.id}/habilitar`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!res.ok) throw new Error("Error al rehabilitar");
+      slot.estado = slot.capacidad_ocupada >= slot.capacidad_total ? "OCUPADO" : "DISPONIBLE";
+      slot.color_status = slot.estado;
+      setActionSuccess(`Sepultura ${slot.codigo_completo} rehabilitada exitosamente.`);
+    } catch {
+      setActionSuccess("Error al rehabilitar la ubicación.");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   return (
+
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-sm transition-opacity">
       <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
         <div 
@@ -463,6 +509,79 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                     </p>
                   </div>
                 </a>
+
+                {/* Disable / Enable Slot (EETT 3.1 & A2-01) */}
+                {slot.color_status === "BLOQUEADO" || slot.estado === "BLOQUEADO" ? (
+                  <button
+                    onClick={handleHabilitar}
+                    disabled={isUpdatingStatus}
+                    className="w-full p-4 rounded-2xl border text-left flex items-start space-x-3.5 hover:border-emerald-500 hover:bg-emerald-50/20 transition-all group"
+                    style={{ borderColor: "var(--color-border)" }}
+                  >
+                    <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                        {isUpdatingStatus ? "Rehabilitando..." : "Rehabilitar Sepultura"}
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Restablece el estado activo de la sepultura para nuevas asignaciones e inhumaciones.
+                      </p>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setShowDisableDialog(true)}
+                      className="w-full p-4 rounded-2xl border text-left flex items-start space-x-3.5 hover:border-rose-500 hover:bg-rose-50/20 transition-all group"
+                      style={{ borderColor: "var(--color-border)" }}
+                    >
+                      <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                        <Ban className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-rose-600 dark:text-rose-400">
+                          Deshabilitar Sepultura / Fosa
+                        </h4>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Bloquea temporal o permanentemente por obras o riesgo sin borrar el historial (EETT 3.1).
+                        </p>
+                      </div>
+                    </button>
+
+                    {showDisableDialog && (
+                      <div className="p-4 rounded-2xl border bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50 space-y-3">
+                        <label className="block text-xs font-bold text-rose-800 dark:text-rose-300">
+                          Motivo obligatorio de deshabilitación:
+                        </label>
+                        <input
+                          type="text"
+                          value={disableReason}
+                          onChange={(e) => setDisableReason(e.target.value)}
+                          placeholder="Ej: Hundimiento de terreno, obras de refacción, decreto..."
+                          className="w-full px-3 py-2 text-xs rounded-xl border outline-none bg-white dark:bg-gray-900"
+                          style={{ borderColor: "var(--color-border)" }}
+                        />
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => { setShowDisableDialog(false); setDisableReason(""); }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={handleDeshabilitar}
+                            disabled={!disableReason.trim() || isUpdatingStatus}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50"
+                          >
+                            {isUpdatingStatus ? "Deshabilitando..." : "Confirmar Bloqueo"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

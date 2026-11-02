@@ -20,7 +20,10 @@ import {
   Clock,
   HardHat,
   FileCheck,
-  UserCog
+  UserCog,
+  BookmarkCheck,
+  ArrowRightLeft,
+  Hammer
 } from "lucide-react";
 import ThemeCustomizerModal from "./ThemeCustomizerModal";
 
@@ -35,12 +38,16 @@ export default function Navbar() {
     { href: "/", label: t("navDashboard"), icon: Building2 },
     { href: "/ubicaciones", label: t("navUbicaciones"), icon: MapPin },
     { href: "/arriendos", label: t("navArriendos"), icon: Clock },
-    { href: "/campo", label: t("navModoTerreno"), icon: HardHat },
     { href: "/inhumaciones", label: t("navInhumaciones"), icon: Users },
+    { href: "/reservas", label: t("navReservas"), icon: BookmarkCheck },
+    { href: "/exhumaciones", label: t("navExhumaciones"), icon: ArrowRightLeft },
+    { href: "/maestros", label: t("navMaestros"), icon: Hammer },
+    { href: "/campo", label: t("navModoTerreno"), icon: HardHat },
     { href: "/auditoria", label: t("navAuditoria"), icon: ShieldCheck },
     { href: "/migracion", label: t("navMigracion"), icon: Database },
     { href: "/admin", label: t("navAdmin"), icon: UserCog },
   ];
+
 
   return (
     <>

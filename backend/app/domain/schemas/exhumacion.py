@@ -6,9 +6,12 @@ from pydantic import BaseModel, ConfigDict
 class ExhumacionCreate(BaseModel):
     inhumacion_id: int
     ubicacion_destino_id: Optional[int] = None
+    ubicacion_destino_codigo: Optional[str] = None
+    cementerio_id: Optional[int] = None
     destino_externo: Optional[str] = None
     fecha_exhumacion: date
     hora_exhumacion: Optional[str] = None
+
     resolucion_numero: Optional[str] = None
     fecha_resolucion: Optional[date] = None
     solicitante_nombre: Optional[str] = None

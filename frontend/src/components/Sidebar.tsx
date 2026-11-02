@@ -26,7 +26,10 @@ import {
   Shield,
   Layers,
   FileCheck2,
-  Bot
+  Bot,
+  BookmarkCheck,
+  ArrowRightLeft,
+  Hammer
 } from "lucide-react";
 import ThemeCustomizerModal from "./ThemeCustomizerModal";
 
@@ -95,9 +98,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { href: "/ubicaciones", label: t("navUbicaciones") || "Ubicaciones & GIS", icon: MapPin },
         { href: "/arriendos", label: t("navArriendos") || "Arriendos & Concesiones", icon: Clock },
         { href: "/inhumaciones", label: t("navInhumaciones") || "Inhumaciones & Libros", icon: Users },
-        { href: "/campo", label: t("navModoTerreno") || "Modo Terreno & Obras", icon: HardHat, badge: "Offline" },
+        { href: "/reservas", label: t("navReservas") || "Reservas de Sepulturas", icon: BookmarkCheck, badge: "EETT 3.11" },
+        { href: "/exhumaciones", label: t("navExhumaciones") || "Exhumaciones & Traslados", icon: ArrowRightLeft, badge: "EETT 3.6" },
+        { href: "/maestros", label: t("navMaestros") || "Obras & Maestros", icon: Hammer },
+        { href: "/campo", label: t("navModoTerreno") || "Modo Terreno & Faenas", icon: HardHat, badge: "Offline" },
       ]
     },
+
     {
       title: "GOBERNANZA & SEGURIDAD",
       items: [

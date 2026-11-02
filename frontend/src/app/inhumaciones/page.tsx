@@ -17,7 +17,8 @@ import {
   AlertCircle,
   Lock,
   FileCheck2,
-  ArrowRight
+  ArrowRight,
+  Download
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -563,21 +564,34 @@ export default function InhumacionesPage() {
           </p>
         </div>
 
-        {currentUser ? (
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white shadow-md transition-all hover:opacity-90 active:scale-95 self-start sm:self-center"
-            style={{ backgroundColor: "var(--color-primary)" }}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+          <a
+            href={`${apiUrl}/api/v1/inhumaciones/exportar${cemeteryFilter !== 'all' ? `?cementerio_id=${cemeteryFilter}` : ''}`}
+            download
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-sm border shadow-xs transition-all hover:bg-gray-100 dark:hover:bg-gray-800"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+            title="Descargar Libro Oficial en formato CSV (Ley 21.719)"
           >
-            <PlusCircle className="w-5 h-5" />
-            <span>{t("registerBurial")}</span>
-          </button>
-        ) : (
-          <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-500/20">
-            <Eye className="w-4 h-4" />
-            <span>Vista Pública Habilitada por Administración</span>
-          </div>
-        )}
+            <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Exportar Libro CSV</span>
+          </a>
+
+          {currentUser ? (
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white shadow-md transition-all hover:opacity-90 active:scale-95"
+              style={{ backgroundColor: "var(--color-primary)" }}
+            >
+              <PlusCircle className="w-5 h-5" />
+              <span>{t("registerBurial")}</span>
+            </button>
+          ) : (
+            <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-500/20">
+              <Eye className="w-4 h-4" />
+              <span>Vista Pública</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Control Bar: Search, Filters, Privacy Mode */}

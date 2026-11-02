@@ -15,7 +15,9 @@ export const en = {
   navMigracion: "ETL Migration (R1–R12)",
   navAdmin: "Admin Panel",
   navAdminTemas: "Theme Customizer",
-  navMaestros: "Rights of Masons",
+  navMaestros: "Masons & Tomb Works",
+  navReservas: "Grave Reservations",
+  navExhumaciones: "Exhumations & Relocations",
 
   // Search
   searchPlaceholder: "Search deceased by name, RUT (e.g. 12345678-K), folio, or grave...",

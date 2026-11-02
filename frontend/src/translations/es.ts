@@ -15,7 +15,9 @@ export const es = {
   navMigracion: "Migración ETL (R1–R12)",
   navAdmin: "Panel Admin",
   navAdminTemas: "Personalizador de Temas",
-  navMaestros: "Derechos de Maestros",
+  navMaestros: "Derechos de Maestros & Obras",
+  navReservas: "Reservas de Sepulturas",
+  navExhumaciones: "Exhumaciones & Traslados",
 
   // Search
   searchPlaceholder: "Buscar fallecido por nombre, RUT (ej. 12345678-K), folio o sepultura...",

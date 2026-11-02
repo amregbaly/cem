@@ -103,8 +103,23 @@ def create_exhumacion(
     ubic_destino = None
     if req.ubicacion_destino_id:
         ubic_destino = db.query(Ubicacion).filter(Ubicacion.id == req.ubicacion_destino_id).first()
+    elif req.ubicacion_destino_codigo:
+        clean_code = req.ubicacion_destino_codigo.strip().upper()
+        c_query = db.query(Ubicacion)
+        if req.cementerio_id:
+            c_query = c_query.filter(Ubicacion.cementerio_id == req.cementerio_id)
+        candidates = c_query.all()
+        for c in candidates:
+            if c.codigo_completo.upper() == clean_code:
+                ubic_destino = c
+                break
+
+    if req.ubicacion_destino_id or req.ubicacion_destino_codigo:
         if not ubic_destino:
-            raise HTTPException(status_code=404, detail="Ubicación de destino no encontrada.")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Ubicación de destino no encontrada (ID: {req.ubicacion_destino_id}, Código: '{req.ubicacion_destino_codigo}')."
+            )
         if not req.es_reduccion and ubic_destino.capacidad_ocupada >= ubic_destino.capacidad_total:
             raise HTTPException(
                 status_code=400,
@@ -115,6 +130,7 @@ def create_exhumacion(
             status_code=400,
             detail="Debe indicar una ubicación de destino interna o especificar un destino externo (crematorio/otro cementerio)."
         )
+
 
     # Resolve or create applicant
     solicitante = None
