@@ -35,9 +35,12 @@ fi
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
-INSTALL_MODE="docker" # Default
+INSTALL_MODE="sqlite" # Default: use the bundled SQLite database from local repository
 for arg in "$@"; do
     case "$arg" in
+        --sqlite)
+            INSTALL_MODE="sqlite"
+            ;;
         --native|--bare-metal)
             INSTALL_MODE="native"
             ;;
@@ -48,8 +51,9 @@ for arg in "$@"; do
             echo "Uso: ./install.sh [OPCIONES]"
             echo ""
             echo "Opciones:"
-            echo "  --docker       Instalación recomendada mediante contenedores Docker Compose (por defecto)"
-            echo "  --native       Instalación nativa con PostgreSQL local, Node.js 20, Python 3.12 y systemd"
+            echo "  --sqlite       (RECOMENDADA) Instalación nativa directa utilizando la base de datos local actual (Anexo 1)"
+            echo "  --native       Instalación nativa con servidor PostgreSQL local y migración de datos"
+            echo "  --docker       Instalación mediante contenedores Docker Compose"
             echo "  -h, --help     Muestra esta ayuda"
             exit 0
             ;;
@@ -168,13 +172,148 @@ install_docker_mode() {
 }
 
 # ==============================================================================
-# MODO 2: INSTALACIÓN NATIVA EN UBUNTU (BARE METAL)
+# MODO 2: INSTALACIÓN NATIVA DIRECTA (SQLITE - USA LA BASE DE DATOS ACTUAL)
+# ==============================================================================
+install_sqlite_mode() {
+    check_sudo
+    info "Iniciando instalación directa con la base de datos actual (SQLite / Anexo 1)..."
+
+    info "Actualizando repositorios de Ubuntu e instalando dependencias base..."
+    $SUDO apt-get update -y
+    $SUDO apt-get install -y \
+        build-essential \
+        curl \
+        git \
+        sqlite3 \
+        python3 \
+        python3-pip \
+        python3-venv \
+        python3-dev \
+        libssl-dev \
+        libffi-dev
+
+    # 1. Configurar Backend Python
+    info "Configurando Backend FastAPI y entorno virtual Python..."
+    cd "$PROJECT_DIR/backend"
+    if [ ! -d ".venv" ]; then
+        python3 -m venv .venv
+    fi
+
+    # Instalar UV para instalaciones rápidas
+    if ! command -v uv >/dev/null 2>&1; then
+        info "Instalando instalador rápido Astral UV..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh || true
+        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+    fi
+
+    if command -v uv >/dev/null 2>&1; then
+        uv pip install -p .venv/bin/python -r pyproject.toml
+    else
+        .venv/bin/pip install --upgrade pip
+        .venv/bin/pip install -e .
+    fi
+
+    # Configurar .env del backend para usar la base de datos actual
+    if [ ! -f .env ]; then
+        cat << 'ENVEOF' > .env
+ENVIRONMENT=production
+DEBUG=False
+APP_NAME="Sistema de Gestión Cementerios Municipales San Carlos y Cachapoal"
+APP_VERSION=1.0.0
+SECRET_KEY=cemetery-secret-key-production-local-2026
+API_V1_STR=/api/v1
+AUDIT_HMAC_SECRET=cemetery-hmac-sha256-audit-secret-key-32bytes-min
+TOTP_ISSUER="Cementerio Municipal San Carlos"
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+DATABASE_URL=sqlite:///./cem_dev.db
+ENVEOF
+        success "Archivo backend/.env configurado con SQLite."
+    fi
+
+    # Verificar que los archivos de base de datos actuales existan
+    if [ -f "cem_core.db" ]; then
+        success "Base de datos actual encontrada (cem_core.db). Preservando todos los registros."
+    else
+        warn "cem_core.db no encontrada, ejecutando inicialización..."
+        .venv/bin/python3 app/infrastructure/db/init_db.py
+    fi
+
+    # 2. Configurar Node.js y Frontend
+    info "Verificando Node.js..."
+    if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d'.' -f1 | tr -d 'v')" -lt 18 ]; then
+        info "Instalando Node.js 20 LTS desde NodeSource..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash -
+        $SUDO apt-get install -y nodejs
+    fi
+    success "Node.js listo: $(node -v) con npm $(npm -v)"
+
+    info "Instalando dependencias del Frontend y compilando paquete de producción..."
+    cd "$PROJECT_DIR/frontend"
+    npm install
+    NEXT_PUBLIC_API_URL="http://localhost:8001" npm run build
+    success "Frontend compilado correctamente."
+
+    # 3. Crear servicios systemd para arranque automático
+    info "Creando servicios systemd para backend y frontend..."
+    CURRENT_USER="${SUDO_USER:-$USER}"
+
+    # Servicio Backend
+    $SUDO tee /etc/systemd/system/cem-backend.service > /dev/null << SYSTEMD_BACKEND
+[Unit]
+Description=Sistema Cementerios - Backend FastAPI (SQLite Mode)
+After=network.target
+
+[Service]
+Type=simple
+User=$CURRENT_USER
+WorkingDirectory=$PROJECT_DIR/backend
+ExecStart=$PROJECT_DIR/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 2
+Restart=always
+RestartSec=3
+Environment=PATH=$PROJECT_DIR/backend/.venv/bin:/usr/local/bin:/usr/bin
+Environment=DATABASE_URL=sqlite:///./cem_dev.db
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMD_BACKEND
+
+    # Servicio Frontend
+    $SUDO tee /etc/systemd/system/cem-frontend.service > /dev/null << SYSTEMD_FRONTEND
+[Unit]
+Description=Sistema Cementerios - Frontend Next.js
+After=network.target cem-backend.service
+
+[Service]
+Type=simple
+User=$CURRENT_USER
+WorkingDirectory=$PROJECT_DIR/frontend
+ExecStart=/usr/bin/npm start -- -p 5011
+Restart=always
+RestartSec=3
+Environment=PORT=5011
+Environment=NODE_ENV=production
+Environment=NEXT_PUBLIC_API_URL=http://localhost:8001
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMD_FRONTEND
+
+    $SUDO systemctl daemon-reload
+    $SUDO systemctl enable --now cem-backend.service
+    $SUDO systemctl enable --now cem-frontend.service
+    success "Servicios systemd activados y en ejecución con la base de datos local."
+
+    cd "$PROJECT_DIR"
+}
+
+# ==============================================================================
+# MODO 3: INSTALACIÓN NATIVA CON POSTGRESQL (CON SINCRONIZACIÓN DE DATOS)
 # ==============================================================================
 install_native_mode() {
     check_sudo
-    info "Iniciando instalación nativa en Ubuntu..."
+    info "Iniciando instalación nativa con servidor PostgreSQL..."
 
-    info "Actualizando repositorios de Ubuntu..."
+    info "Actualizando repositorios de Ubuntu e instalando dependencias..."
     $SUDO apt-get update -y
     $SUDO apt-get install -y \
         build-essential \
@@ -183,6 +322,7 @@ install_native_mode() {
         libpq-dev \
         postgresql \
         postgresql-contrib \
+        sqlite3 \
         python3 \
         python3-pip \
         python3-venv \
@@ -214,7 +354,6 @@ install_native_mode() {
         python3 -m venv .venv
     fi
 
-    # Instalar UV para instalaciones ultrarrápidas si está disponible
     if ! command -v uv >/dev/null 2>&1; then
         info "Instalando instalador rápido Astral UV..."
         curl -LsSf https://astral.sh/uv/install.sh | sh || true
@@ -228,17 +367,23 @@ install_native_mode() {
         .venv/bin/pip install -e .
     fi
 
-    # Inicializar datos semilla (Admin y cementerios)
-    info "Inicializando tablas y datos semilla..."
-    .venv/bin/python3 -c "
+    # Inicializar tablas y datos semilla
+    info "Inicializando tablas en PostgreSQL..."
+    DATABASE_URL=postgresql+psycopg2://cem_admin:cem_secure_password_2026@localhost:5432/cem_db .venv/bin/python3 -c "
 from app.infrastructure.db.session import SessionLocal
 from app.infrastructure.db.init_db import init_db
 db = SessionLocal()
 init_db(db)
 db.close()
-print('Base de datos inicializada.')
+print('Base de datos PostgreSQL inicializada.')
 "
-    success "Backend configurado con éxito."
+
+    # Sincronizar datos desde la base de datos actual (SQLite) si existe
+    if [ -f "$PROJECT_DIR/backend/cem_core.db" ] && [ -f "$PROJECT_DIR/backend/scripts/sync_sqlite_to_pg.py" ]; then
+        info "Sincronizando registros actuales desde cem_core.db a PostgreSQL..."
+        .venv/bin/python3 "$PROJECT_DIR/backend/scripts/sync_sqlite_to_pg.py" "postgresql+psycopg2://cem_admin:cem_secure_password_2026@localhost:5432/cem_db" || warn "Sincronización SQLite a PostgreSQL continuó con advertencias."
+    fi
+    success "Backend y base de datos PostgreSQL sincronizados."
 
     # 3. Configurar Node.js y Frontend
     info "Verificando Node.js..."
@@ -262,7 +407,7 @@ print('Base de datos inicializada.')
     # Servicio Backend
     $SUDO tee /etc/systemd/system/cem-backend.service > /dev/null << SYSTEMD_BACKEND
 [Unit]
-Description=Sistema Cementerios - Backend FastAPI
+Description=Sistema Cementerios - Backend FastAPI (PostgreSQL Mode)
 After=network.target postgresql.service
 
 [Service]
@@ -309,7 +454,9 @@ SYSTEMD_FRONTEND
 }
 
 # ─── Ejecución del modo seleccionado ──────────────────────────────────────────
-if [ "$INSTALL_MODE" = "docker" ]; then
+if [ "$INSTALL_MODE" = "sqlite" ]; then
+    install_sqlite_mode
+elif [ "$INSTALL_MODE" = "docker" ]; then
     install_docker_mode
 else
     install_native_mode

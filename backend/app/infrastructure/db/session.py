@@ -28,11 +28,19 @@ if "sqlite" in settings.DATABASE_URL:
 
         dbapi_connection.create_function("unaccent_sql", 1, unaccent_py)
 
+        # Resolve db paths relative to backend directory so working directory changes don't disconnect schemas
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        core_path = os.path.join(base_dir, "cem_core.db")
+        staging_path = os.path.join(base_dir, "cem_staging.db")
+        migration_path = os.path.join(base_dir, "cem_migration.db")
+        audit_path = os.path.join(base_dir, "cem_audit.db")
+
         cursor = dbapi_connection.cursor()
-        cursor.execute("ATTACH DATABASE 'cem_core.db' AS core")
-        cursor.execute("ATTACH DATABASE 'cem_staging.db' AS staging")
-        cursor.execute("ATTACH DATABASE 'cem_migration.db' AS migration")
-        cursor.execute("ATTACH DATABASE 'cem_audit.db' AS audit")
+        cursor.execute(f"ATTACH DATABASE '{core_path}' AS core")
+        cursor.execute(f"ATTACH DATABASE '{staging_path}' AS staging")
+        cursor.execute(f"ATTACH DATABASE '{migration_path}' AS migration")
+        cursor.execute(f"ATTACH DATABASE '{audit_path}' AS audit")
         try:
             cursor.execute("""
                 CREATE TRIGGER IF NOT EXISTS audit.trg_prevent_audit_update

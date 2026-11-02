@@ -37,18 +37,27 @@ chmod +x install.sh
 
 ### 3. Ejecutar la instalación
 
-#### Opción A: Modo Docker Compose (Más fácil y aislado)
+#### Opción A: Modo Base de Datos Actual (Por defecto / Recomendado)
+Utiliza directamente la base de datos actual ya configurada en el repositorio (`backend/cem_core.db`, `cem_audit.db`, `cem_migration.db`) con todos los registros auténticos del Anexo 1, usuarios, radar de vencimientos y configuración de IA. No requiere configurar servidores externos de bases de datos:
+
+```bash
+./install.sh
+# o explícitamente:
+./install.sh --sqlite
+```
+
+#### Opción B: Modo Nativo con PostgreSQL
+Instala PostgreSQL 16 local, Node.js 20, Python 3.12, esquemas normativos (`core`, `audit`, `migration`, `staging`), y **sincroniza automáticamente todos los datos actuales** de la base de datos del repositorio hacia PostgreSQL:
+
+```bash
+./install.sh --native
+```
+
+#### Opción C: Modo Docker Compose
 Instala automáticamente Docker Engine, Docker Compose, construye las imágenes y levanta los servicios en contenedores:
 
 ```bash
 ./install.sh --docker
-```
-
-#### Opción B: Modo Nativo (Bare-metal con Systemd)
-Instala PostgreSQL local, Node.js 20, Python 3.12 y crea los servicios de inicio automático `systemd`:
-
-```bash
-./install.sh --native
 ```
 
 ---
