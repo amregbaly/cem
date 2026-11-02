@@ -85,6 +85,24 @@ check_sudo() {
     fi
 }
 
+run_as_root() {
+    if [ -n "$SUDO" ]; then
+        $SUDO "$@"
+    else
+        "$@"
+    fi
+}
+
+run_as_user() {
+    local target_user="$1"
+    shift
+    if [ -n "$SUDO" ]; then
+        $SUDO -u "$target_user" "$@"
+    else
+        su - "$target_user" -c "$*"
+    fi
+}
+
 # ─── CONFIGURAR .ENV ──────────────────────────────────────────────────────────
 setup_env() {
     info "Configurando variables de entorno (.env)..."
@@ -242,8 +260,15 @@ ENVEOF
     info "Verificando Node.js..."
     if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d'.' -f1 | tr -d 'v')" -lt 18 ]; then
         info "Instalando Node.js 20 LTS desde NodeSource..."
-        curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash -
-        $SUDO apt-get install -y nodejs
+        curl -fsSL https://deb.nodesource.com/setup_20.x -o /tmp/nodesource_setup.sh
+        if [ -n "$SUDO" ]; then
+            $SUDO bash /tmp/nodesource_setup.sh
+            $SUDO apt-get install -y nodejs
+        else
+            bash /tmp/nodesource_setup.sh
+            apt-get install -y nodejs
+        fi
+        rm -f /tmp/nodesource_setup.sh
     fi
     success "Node.js listo: $(node -v) con npm $(npm -v)"
 
@@ -389,8 +414,15 @@ print('Base de datos PostgreSQL inicializada.')
     info "Verificando Node.js..."
     if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d'.' -f1 | tr -d 'v')" -lt 18 ]; then
         info "Instalando Node.js 20 LTS desde NodeSource..."
-        curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash -
-        $SUDO apt-get install -y nodejs
+        curl -fsSL https://deb.nodesource.com/setup_20.x -o /tmp/nodesource_setup.sh
+        if [ -n "$SUDO" ]; then
+            $SUDO bash /tmp/nodesource_setup.sh
+            $SUDO apt-get install -y nodejs
+        else
+            bash /tmp/nodesource_setup.sh
+            apt-get install -y nodejs
+        fi
+        rm -f /tmp/nodesource_setup.sh
     fi
     success "Node.js listo: $(node -v) con npm $(npm -v)"
 
