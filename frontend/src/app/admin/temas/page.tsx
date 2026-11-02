@@ -66,7 +66,8 @@ export default function AdminTemasPage() {
   const handleSaveToBackend = async () => {
     setSavedSuccess(true);
     try {
-      await fetch("http://localhost:8001/api/v1/temas", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      await fetch(`${apiUrl}/api/v1/temas`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

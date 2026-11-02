@@ -57,7 +57,7 @@ export default function TopHeader({ onOpenMobileMenu }: TopHeaderProps) {
   };
 
   const breadcrumbs = getBreadcrumbs();
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
 
   const handleDownloadExitPackage = async () => {
     setDownloading(true);

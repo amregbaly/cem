@@ -37,7 +37,8 @@ export default function AuditVerificationBadge() {
   const handleVerify = async () => {
     setVerifying(true);
     try {
-      const res = await fetch("http://localhost:8001/api/v1/auditoria/verificar");
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${apiUrl}/api/v1/auditoria/verificar`);
       if (res.ok) {
         const data = await res.json();
         setResult({

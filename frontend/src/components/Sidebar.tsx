@@ -60,7 +60,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     readUser();
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
     fetch(`${apiUrl}/api/v1/portal/config`)
       .then(res => res.json())
       .then(data => {

@@ -677,41 +677,40 @@ def seed_spatial_sample_data(db: Session) -> None:
         portal_cfg.permitir_busqueda_publica = True
 
     # Seed Sample Certificate using real deceased from Anexo 1
-    sample_inh = db.query(Inhumacion).first()
-    if sample_inh and db.query(Certificado).count() == 0:
-        fallecido_nombre = sample_inh.fallecido.nombre_completo if sample_inh.fallecido else "JORGE MORALES"
-        rut_fallecido = sample_inh.fallecido.rut if sample_inh.fallecido else "NN"
+    # Ensure official demonstration certificate CERT-2026-0089 exists
+    demo_cert = db.query(Certificado).filter(Certificado.folio == "CERT-2026-0089").first()
+    if not demo_cert:
         today = date.today()
         try:
             pdf_b, sha_hash, qr_b64 = generate_certificate_pdf(
-                folio=f"CERT-{sample_inh.numero_ingreso or '2026-0001'}",
-                token_verificacion="e78f3c42918b45a0d3198e72fa0124cc",
+                folio="CERT-2026-0089",
+                token_verificacion="c89f3c42918b45a0d3198e72fa0124cc",
                 tipo_certificado="INHUMACION",
                 cementerio_nombre=cem_sc.nombre,
-                codigo_ubicacion=f"{sample_inh.ubicacion.sector_codigo}-{sample_inh.ubicacion.numero}",
-                fallecido_nombre=fallecido_nombre,
-                rut_fallecido=rut_fallecido,
+                codigo_ubicacion="MIG-F01-89",
+                fallecido_nombre="RAMON PIZARRO SOTO",
+                rut_fallecido="21.793.309-9",
                 titular_nombre="ADMINISTRACION MUNICIPAL",
                 rut_titular="69.140.100-3",
                 fecha_emision=today
             )
-            cert_sample = Certificado(
-                folio=f"CERT-{sample_inh.numero_ingreso or '2026-0001'}",
-                token_verificacion="e78f3c42918b45a0d3198e72fa0124cc",
+            cert_demo = Certificado(
+                folio="CERT-2026-0089",
+                token_verificacion="c89f3c42918b45a0d3198e72fa0124cc",
                 tipo_certificado="INHUMACION",
                 estado="VIGENTE",
                 cementerio_id=cem_sc.id,
-                fallecido_nombre=fallecido_nombre,
-                rut_fallecido=rut_fallecido,
+                fallecido_nombre="RAMON PIZARRO SOTO",
+                rut_fallecido="21.793.309-9",
                 titular_nombre="ADMINISTRACION MUNICIPAL",
                 rut_titular="69.140.100-3",
-                codigo_ubicacion=f"{sample_inh.ubicacion.sector_codigo}-{sample_inh.ubicacion.numero}",
+                codigo_ubicacion="MIG-F01-89",
                 fecha_emision=today,
                 sha256_hash=sha_hash,
                 codigo_qr_base64=qr_b64,
-                observaciones="Certificado oficial de sepultación con firma digital y validación QR Ley 19.799"
+                observaciones="Certificado oficial de sepultación de demostración con firma digital y validación QR Ley 19.799"
             )
-            db.add(cert_sample)
+            db.add(cert_demo)
         except Exception:
             pass
 

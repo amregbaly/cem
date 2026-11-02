@@ -56,7 +56,7 @@ export default function CertificateVerificationPage() {
     setLoading(true);
     setError(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const res = await fetch(`${apiUrl}/api/v1/certificados/publico/${encodeURIComponent(targetFolio)}`);
       if (!res.ok) {
         if (res.status === 404) {
@@ -89,7 +89,7 @@ export default function CertificateVerificationPage() {
     }
   };
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
 
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto space-y-8 animate-fadeIn">

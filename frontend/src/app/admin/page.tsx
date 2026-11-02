@@ -220,7 +220,7 @@ export default function AdminPage() {
   // Action status message
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
 
   // Check stored token on mount
   useEffect(() => {

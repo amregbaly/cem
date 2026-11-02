@@ -51,7 +51,7 @@ export default function CertificatePortalPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
 
   const handleVerify = async (targetFolio: string) => {
     const clean = targetFolio.trim();

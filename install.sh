@@ -317,7 +317,7 @@ Restart=always
 RestartSec=3
 Environment=PORT=5011
 Environment=NODE_ENV=production
-Environment=NEXT_PUBLIC_API_URL=http://localhost:8001
+Environment=NEXT_PUBLIC_API_URL=
 
 [Install]
 WantedBy=multi-user.target
@@ -471,7 +471,7 @@ Restart=always
 RestartSec=3
 Environment=PORT=5011
 Environment=NODE_ENV=production
-Environment=NEXT_PUBLIC_API_URL=http://localhost:8001
+Environment=NEXT_PUBLIC_API_URL=
 
 [Install]
 WantedBy=multi-user.target

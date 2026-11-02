@@ -110,7 +110,8 @@ export default function MigracionPage() {
   const handleRunReconciliation = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8001/api/v1/migracion/reconciliacion");
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${apiUrl}/api/v1/migracion/reconciliacion`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.hojas)) {

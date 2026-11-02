@@ -79,7 +79,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
     setActionSuccess(null);
     setLoadingHistory(true);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
     fetch(`${apiUrl}/api/v1/ubicaciones/${slot.id}/historial`)
       .then(res => {
         if (!res.ok) throw new Error("Error loading history");
@@ -161,7 +161,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
     setIsEmitting(true);
     setActionSuccess(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const payload = {
         tipo_certificado: "INHUMACION",
         cementerio_id: slot.cementerio?.includes("Cachapoal") ? 2 : 1,

@@ -70,7 +70,7 @@ export const CemeteryMap: React.FC<CemeteryMapProps> = ({
 
   // Load sectors whenever cemetery changes
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
     fetch(`${apiUrl}/api/v1/ubicaciones/mapa/sectores?cementerio_id=${cemeteryId}`)
       .then(res => {
         if (!res.ok) throw new Error("Failed to load sectors");
@@ -145,7 +145,7 @@ export const CemeteryMap: React.FC<CemeteryMapProps> = ({
     if (!activeSector) return;
     setLoading(true);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
     const filterParam = statusFilter !== "TODOS" ? `&estado_filtro=${statusFilter}` : "";
     fetch(`${apiUrl}/api/v1/ubicaciones/mapa/cuadricula?cementerio_id=${cemeteryId}&sector_codigo=${activeSector}${filterParam}`)
       .then(res => {

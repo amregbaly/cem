@@ -3,7 +3,7 @@
  * All calls go through the Next.js API URL (NEXT_PUBLIC_API_URL).
  */
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export interface AsistenteConfig {
   habilitado: boolean;

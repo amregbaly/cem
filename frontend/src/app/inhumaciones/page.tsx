@@ -69,7 +69,7 @@ export default function InhumacionesPage() {
   const [maskCause, setMaskCause] = useState<boolean>(true);
   const [showModal, setShowModal] = useState<boolean>(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
 
   useEffect(() => {
     setMounted(true);

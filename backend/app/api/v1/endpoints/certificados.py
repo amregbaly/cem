@@ -232,13 +232,21 @@ def descargar_certificado_pdf(
     it automatically generates, signs, records, and returns the official certificate PDF.
     """
     clean_folio = folio.strip().upper()
-    cert = db.query(Certificado).filter(Certificado.folio == clean_folio).first()
+    unprefixed = clean_folio.replace("ING-", "").replace("CERT-", "")
+    cert = db.query(Certificado).filter(
+        (Certificado.folio == clean_folio) |
+        (Certificado.folio == f"ING-{unprefixed}") |
+        (Certificado.folio == f"CERT-{unprefixed}") |
+        (Certificado.folio == unprefixed)
+    ).first()
     
     if not cert:
         # Check if matching Inhumacion exists in DB
         inh = db.query(Inhumacion).filter(
             (Inhumacion.pase_sepultacion_folio == clean_folio) |
-            (Inhumacion.numero_ingreso == clean_folio)
+            (Inhumacion.pase_sepultacion_folio == unprefixed) |
+            (Inhumacion.numero_ingreso == clean_folio) |
+            (Inhumacion.numero_ingreso == unprefixed)
         ).first()
 
         # Resolve cemetery
@@ -339,11 +347,74 @@ def verificar_certificado_publico(folio_or_token: str, db: Session = Depends(get
     Public citizen verification portal (Ley 21.719 & EETT 3.10).
     Exposes ONLY: type, folio, issue date, status, SHA-256.
     Never exposes medical cause of death or personal contact numbers.
+    Supports resolution by Folio, Token QR, or Official Inhumation Number (e.g. ING-XXXX).
     """
     param = folio_or_token.strip()
+    clean_folio = param.upper()
+    unprefixed = clean_folio.replace("ING-", "").replace("CERT-", "")
+
     cert = db.query(Certificado).filter(
-        (Certificado.folio == param.upper()) | (Certificado.token_verificacion == param.lower())
+        (Certificado.folio == clean_folio) |
+        (Certificado.folio == f"ING-{unprefixed}") |
+        (Certificado.folio == f"CERT-{unprefixed}") |
+        (Certificado.folio == unprefixed) |
+        (Certificado.token_verificacion == param.lower())
     ).first()
+
+    if not cert:
+        # Check if matching Inhumacion exists in DB
+        inh = db.query(Inhumacion).filter(
+            (Inhumacion.numero_ingreso == clean_folio) |
+            (Inhumacion.numero_ingreso == unprefixed) |
+            (Inhumacion.pase_sepultacion_folio == clean_folio) |
+            (Inhumacion.pase_sepultacion_folio == unprefixed)
+        ).first()
+
+        if inh:
+            cem_obj = inh.ubicacion.cementerio if inh.ubicacion and inh.ubicacion.cementerio else db.query(Cementerio).first()
+            cem_name = cem_obj.nombre if cem_obj else "Cementerio Municipal de San Carlos"
+            fallecido_name = inh.fallecido.nombre_completo if inh.fallecido else "REGISTRO MUNICIPAL"
+            rut_fall = inh.fallecido.rut if inh.fallecido else None
+            cod_ubic = inh.ubicacion.codigo_completo if inh.ubicacion else f"{inh.ubicacion.sector_codigo}-{inh.ubicacion.numero}" if inh.ubicacion else "N/A"
+            token_128bit = secrets.token_hex(16)
+            tipo_cert = "INHUMACION"
+
+            pdf_bytes, sha256_hash, qr_base64 = generate_certificate_pdf(
+                folio=clean_folio,
+                token_verificacion=token_128bit,
+                tipo_certificado=tipo_cert,
+                cementerio_nombre=cem_name,
+                codigo_ubicacion=cod_ubic,
+                fallecido_nombre=fallecido_name,
+                rut_fallecido=rut_fall,
+                fecha_emision=date.today(),
+                observaciones="Emisión digital oficial de registro de inhumación municipal."
+            )
+
+            cert = Certificado(
+                folio=clean_folio,
+                token_verificacion=token_128bit,
+                tipo_certificado=tipo_cert,
+                estado="VIGENTE",
+                cementerio_id=cem_obj.id if cem_obj else 1,
+                ubicacion_id=inh.ubicacion_id,
+                inhumacion_id=inh.id,
+                fallecido_nombre=fallecido_name,
+                rut_fallecido=rut_fall,
+                codigo_ubicacion=cod_ubic,
+                fecha_emision=date.today(),
+                sha256_hash=sha256_hash,
+                codigo_qr_base64=qr_base64,
+                pdf_bytes=base64.b64encode(pdf_bytes).decode("ascii"),
+                observaciones="Emisión digital oficial de registro de inhumación municipal."
+            )
+            db.add(cert)
+            try:
+                db.commit()
+                db.refresh(cert)
+            except Exception:
+                db.rollback()
+                cert = db.query(Certificado).filter(Certificado.folio == clean_folio).first()
 
     if not cert:
         raise HTTPException(

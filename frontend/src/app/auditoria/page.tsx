@@ -117,7 +117,7 @@ export default function AuditoriaPage() {
   const handleVerifyChain = async () => {
     setVerifying(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const res = await fetch(`${apiUrl}/api/v1/auditoria/verificar`);
       if (res.ok) {
         const data = await res.json();
@@ -141,13 +141,13 @@ export default function AuditoriaPage() {
 
   const handleDownloadExitPackage = () => {
     setDownloadingZip(true);
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
     window.open(`${apiUrl}/api/v1/auditoria/exit-package`, "_blank");
     setTimeout(() => setDownloadingZip(false), 3000);
   };
 
   const handleExportCSV = () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
     window.open(`${apiUrl}/api/v1/auditoria/export-csv`, "_blank");
   };
 
