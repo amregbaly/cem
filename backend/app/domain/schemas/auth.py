@@ -29,3 +29,31 @@ class TOTPSetupResponse(BaseModel):
 
 class TOTPVerifyRequest(BaseModel):
     code: str
+
+
+class UsuarioCreateRequest(BaseModel):
+    username: str
+    email: Optional[str] = None
+    rut: Optional[str] = None
+    nombre_completo: str
+    password: str
+    rol: str = "ADMINISTRATIVO"
+    grupo_id: Optional[int] = None
+
+
+class UsuarioResponse(BaseModel):
+    id: int
+    username: str
+    email: Optional[str] = None
+    rut: Optional[str] = None
+    nombre_completo: str
+    rol: str
+    grupo_id: Optional[int] = None
+    grupo_nombre: Optional[str] = None
+    activo: bool
+    totp_enabled: bool = False
+    intentos_fallidos: int = 0
+    bloqueado_hasta: Optional[str] = None
+    ultimo_acceso: Optional[str] = None
+
+

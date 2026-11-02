@@ -13,7 +13,11 @@ import {
   AlertTriangle,
   Code2,
   Copy,
-  Check
+  Check,
+  Download,
+  FileArchive,
+  FileSpreadsheet,
+  Database
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -108,16 +112,17 @@ export default function AuditoriaPage() {
   const [selectedLog, setSelectedLog] = useState<AuditEntry | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [filterModule, setFilterModule] = useState("all");
+  const [downloadingZip, setDownloadingZip] = useState(false);
 
   const handleVerifyChain = async () => {
     setVerifying(true);
     try {
-      const res = await fetch("http://localhost:8001/api/v1/auditoria/verificar");
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+      const res = await fetch(`${apiUrl}/api/v1/auditoria/verificar`);
       if (res.ok) {
         const data = await res.json();
         setIsChainValid(data.valido);
       } else {
-        // Local verification check: verify each entry's hash_previo == previous entry's hash_registro
         let valid = true;
         for (let i = 1; i < logs.length; i++) {
           if (logs[i].hash_previo !== logs[i - 1].hash_registro) {
@@ -134,6 +139,18 @@ export default function AuditoriaPage() {
     }
   };
 
+  const handleDownloadExitPackage = () => {
+    setDownloadingZip(true);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+    window.open(`${apiUrl}/api/v1/auditoria/exit-package`, "_blank");
+    setTimeout(() => setDownloadingZip(false), 3000);
+  };
+
+  const handleExportCSV = () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+    window.open(`${apiUrl}/api/v1/auditoria/export-csv`, "_blank");
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedHash(text);
@@ -146,16 +163,69 @@ export default function AuditoriaPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeIn">
       
       {/* Title */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
-          {t("auditTitle")}
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {t("auditSubtitle")}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
+            {t("auditTitle")}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {t("auditSubtitle")}
+          </p>
+        </div>
+
+        {/* Exit Package & CSV Action Buttons */}
+        <div className="flex items-center space-x-2.5 self-start sm:self-center">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all hover:bg-black/5 dark:hover:bg-white/5 shadow-xs"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>{t("btnExportAuditCSV")}</span>
+          </button>
+
+          <button
+            onClick={handleDownloadExitPackage}
+            disabled={downloadingZip}
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-md transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: "var(--color-primary)" }}
+          >
+            <FileArchive className="w-4 h-4" />
+            <span>{downloadingZip ? t("exportingExitPackage") : t("btnDownloadExitPackage")}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Exit Package Notice Card (Ley 21.719 / Cláusula de Salida) */}
+      <div 
+        className="p-5 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-colors"
+        style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+      >
+        <div className="flex items-start space-x-3.5">
+          <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex-shrink-0">
+            <Database className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-bold text-sm" style={{ color: "var(--color-text)" }}>
+              {t("exitPackageTitle")}
+            </h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed max-w-3xl">
+              {t("exitPackageDesc")}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleDownloadExitPackage}
+          className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-transform hover:scale-105"
+          style={{ backgroundColor: "var(--color-secondary)" }}
+        >
+          <Download className="w-4 h-4" />
+          <span>ZIP</span>
+        </button>
       </div>
 
       {/* Cryptographic Verification Hero Card */}
@@ -175,14 +245,14 @@ export default function AuditoriaPage() {
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="text-lg font-bold" style={{ color: "var(--color-text)" }}>
-                  {isChainValid ? "Cadena Criptográfica 100% Íntegra" : "ALERTA: Corrupción o Alteración Detectada"}
+                  {isChainValid ? t("auditValidMsg") : t("auditInvalidMsg")}
                 </h3>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                   SHA-256 Chained
                 </span>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-2xl leading-relaxed">
-                Cada transacción de la base de datos incorpora el hash criptográfico del registro anterior firmado con llave secreta HMAC municipal. Ningún registro puede ser modificado o borrado sin romper inmediatamente toda la cadena.
+                Cada transacción de la base de datos incorpora el hash criptográfico del registro anterior firmado con HMAC. Ningún registro puede ser modificado o borrado sin romper inmediatamente toda la cadena.
               </p>
             </div>
           </div>
@@ -204,7 +274,7 @@ export default function AuditoriaPage() {
           style={{ borderColor: "var(--color-border)" }}
         >
           <div className="md:col-span-2">
-            <span className="text-gray-400 block mb-1">Hash de Cabecera Actual (Head Hash):</span>
+            <span className="text-gray-400 block mb-1">{t("auditHeadHash")}:</span>
             <div className="flex items-center space-x-2">
               <code className="p-2 rounded-lg bg-black/5 dark:bg-white/5 font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-bold break-all flex-1">
                 {logs[logs.length - 1]?.hash_registro}
@@ -225,7 +295,7 @@ export default function AuditoriaPage() {
           </div>
 
           <div>
-            <span className="text-gray-400 block mb-1">Total Entradas Encadenadas:</span>
+            <span className="text-gray-400 block mb-1">{t("auditRecordsChecked")}:</span>
             <div className="text-base font-extrabold text-gray-700 dark:text-gray-200">
               {logs.length} mutaciones inmutables
             </div>
@@ -235,7 +305,7 @@ export default function AuditoriaPage() {
 
       {/* Filter by Module */}
       <div className="flex items-center space-x-2 text-xs">
-        <span className="text-gray-400 font-semibold">Filtrar Módulo:</span>
+        <span className="text-gray-400 font-semibold">{t("filterByType")}:</span>
         {["all", "INHUMACIONES", "DERECHOS", "TEMAS", "EXHUMACIONES"].map(mod => (
           <button
             key={mod}
@@ -248,12 +318,12 @@ export default function AuditoriaPage() {
               borderColor: "var(--color-border)"
             }}
           >
-            {mod === "all" ? "Todos los Módulos" : mod}
+            {mod === "all" ? "Todos" : mod}
           </button>
         ))}
       </div>
 
-      {/* Main Audit Log Table */}
+      {/* Immutable Logs Table */}
       <div 
         className="rounded-2xl border overflow-hidden shadow-sm"
         style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
@@ -261,59 +331,51 @@ export default function AuditoriaPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead 
-              className="uppercase font-semibold text-gray-400 border-b"
+              className="text-[11px] uppercase font-semibold text-gray-400 border-b"
               style={{ borderColor: "var(--color-border)", backgroundColor: isDarkMode ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.02)" }}
             >
               <tr>
-                <th className="p-3.5 sm:px-4">Seq #</th>
-                <th className="p-3.5 sm:px-4">{t("date")}</th>
-                <th className="p-3.5 sm:px-4">{t("user")}</th>
-                <th className="p-3.5 sm:px-4">IP Origen</th>
-                <th className="p-3.5 sm:px-4">{t("module")}</th>
-                <th className="p-3.5 sm:px-4">{t("action")}</th>
-                <th className="p-3.5 sm:px-4">Firma HMAC (Hash)</th>
-                <th className="p-3.5 sm:px-4 text-right">Detalle</th>
+                <th className="p-3.5">ID</th>
+                <th className="p-3.5">{t("date")} (CLT)</th>
+                <th className="p-3.5">{t("user")}</th>
+                <th className="p-3.5">IP</th>
+                <th className="p-3.5">{t("module")}</th>
+                <th className="p-3.5">{t("action")}</th>
+                <th className="p-3.5">Hash Criptográfico (SHA-256)</th>
+                <th className="p-3.5 text-right">{t("actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y" style={{ borderColor: "var(--color-border)" }}>
               {filteredLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                  <td className="p-3.5 sm:px-4 font-mono font-bold text-gray-400">
-                    #{log.id.toString().padStart(4, "0")}
+                <tr key={log.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-mono">
+                  <td className="p-3.5 font-bold">{log.id}</td>
+                  <td className="p-3.5 text-gray-500 font-sans">{log.creado_en.replace("T", " ").substring(0, 19)}</td>
+                  <td className="p-3.5 font-sans">
+                    <div className="font-semibold">{log.usuario_id}</div>
+                    <div className="text-[11px] text-gray-400">{log.rut_usuario}</div>
                   </td>
-                  <td className="p-3.5 sm:px-4 font-mono text-[11px] text-gray-600 dark:text-gray-300">
-                    {new Date(log.creado_en).toLocaleString()}
-                  </td>
-                  <td className="p-3.5 sm:px-4">
-                    <div className="font-bold text-gray-700 dark:text-gray-200">{log.usuario_id}</div>
-                    <div className="text-[10px] text-gray-400 font-mono">RUT: {log.rut_usuario}</div>
-                  </td>
-                  <td className="p-3.5 sm:px-4 font-mono text-gray-500">
-                    {log.ip_origen}
-                  </td>
-                  <td className="p-3.5 sm:px-4">
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                  <td className="p-3.5 text-gray-500">{log.ip_origen}</td>
+                  <td className="p-3.5 font-sans">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
                       {log.modulo}
                     </span>
                   </td>
-                  <td className="p-3.5 sm:px-4 font-semibold text-gray-600 dark:text-gray-300">
-                    {log.accion}
-                  </td>
-                  <td className="p-3.5 sm:px-4">
-                    <div className="flex items-center space-x-1 font-mono text-[11px]">
-                      <Lock className="w-3 h-3 text-emerald-500 flex-shrink-0" />
-                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold truncate max-w-[120px]" title={log.hash_registro}>
-                        {log.hash_registro.substring(0, 10)}...
+                  <td className="p-3.5 font-bold font-sans text-gray-700 dark:text-gray-300">{log.accion}</td>
+                  <td className="p-3.5">
+                    <div className="flex items-center space-x-1.5">
+                      <Lock className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold truncate max-w-[120px]">
+                        {log.hash_registro}
                       </span>
                     </div>
                   </td>
-                  <td className="p-3.5 sm:px-4 text-right">
+                  <td className="p-3.5 text-right font-sans">
                     <button
                       onClick={() => setSelectedLog(log)}
-                      className="px-2.5 py-1 rounded-lg border font-bold text-[11px] hover:opacity-80 transition-all"
-                      style={{ borderColor: "var(--color-border)", color: "var(--color-primary)" }}
+                      className="px-2.5 py-1 rounded-lg border text-xs font-semibold hover:opacity-75 transition-all"
+                      style={{ borderColor: "var(--color-border)" }}
                     >
-                      Diff
+                      {t("viewDetails")}
                     </button>
                   </td>
                 </tr>
@@ -323,21 +385,25 @@ export default function AuditoriaPage() {
         </div>
       </div>
 
-      {/* Modal: Inspection of Diff & Cryptographic Hashes */}
+      {/* Log Inspection Modal */}
       {selectedLog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
           <div 
-            className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
             style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
           >
             <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: "var(--color-border)" }}>
               <div className="flex items-center space-x-2">
                 <Code2 className="w-5 h-5 text-primary" />
                 <h3 className="font-bold text-base" style={{ color: "var(--color-text)" }}>
-                  Detalle de Auditoría #{selectedLog.id} • {selectedLog.accion}
+                  Detalle de Transacción #{selectedLog.id} • {selectedLog.modulo}
                 </h3>
               </div>
-              <button onClick={() => setSelectedLog(null)} className="p-1 rounded-lg border text-gray-400 hover:text-black">
+              <button 
+                onClick={() => setSelectedLog(null)} 
+                className="p-1.5 rounded-lg border text-gray-400 hover:text-black dark:hover:text-white"
+                style={{ borderColor: "var(--color-border)" }}
+              >
                 ✕
               </button>
             </div>
@@ -372,10 +438,10 @@ export default function AuditoriaPage() {
             <div className="p-4 border-t flex justify-end" style={{ borderColor: "var(--color-border)" }}>
               <button 
                 onClick={() => setSelectedLog(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-white"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs"
                 style={{ backgroundColor: "var(--color-primary)" }}
               >
-                Cerrar
+                {t("close")}
               </button>
             </div>
           </div>

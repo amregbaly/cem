@@ -73,7 +73,7 @@ cem/
 │   │   └── translations/                  # Diccionarios es.ts y en.ts
 │   └── tailwind.config.ts                 # Tokens mapeados a variables CSS dinámicas
 │
-├── docker-compose.yml                     # PostgreSQL 16 (puerto 5433), API (8001), Frontend (3002)
+├── docker-compose.yml                     # PostgreSQL 16 (puerto 5433), API (8001), Frontend (5011)
 └── ANTIGRAVITY_DEV_PLAN.md                # Especificación técnica maestra del proyecto
 ```
 
@@ -92,7 +92,7 @@ Para iniciar toda la infraestructura (Base de datos PostgreSQL 16 con extensione
 ```bash
 docker compose up -d
 ```
-- **Frontend SPA**: `http://localhost:3002`
+- **Frontend SPA**: `http://localhost:5011`
 - **Backend API & Swagger Docs**: `http://localhost:8001/docs`
 - **PostgreSQL**: `localhost:5433` (base de datos: `cemetery_db`)
 
@@ -108,7 +108,7 @@ uvicorn app.main:app --reload --port 8001
 #### Frontend (Next.js 14):
 ```bash
 cd frontend
-npm run dev -- -p 3002
+npm run dev -- -p 5011
 ```
 
 ---

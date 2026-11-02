@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.infrastructure.db.session import get_db
-from app.domain.models import Inhumacion, Ubicacion, Persona, Usuario, RolUsuario
+from app.domain.models import Inhumacion, Ubicacion, Persona, Usuario, RolUsuario, ConfigPortal
 from app.domain.schemas.inhumacion import InhumacionResponse, InhumacionCreate
 from app.api.deps import require_role, get_current_user_optional, get_current_user
 from app.infrastructure.db.audit_listener import AuditService
@@ -23,9 +23,19 @@ def list_inhumaciones(
     user: Optional[Usuario] = Depends(get_current_user_optional)
 ):
     """
-    List burials. Cause of death is masked for visitor/public profiles.
+    List burials. 
+    If visitor (unauthenticated), access is governed by portal configuration (admin toggle).
+    Cause of death is masked for visitor/public profiles.
     """
     is_staff = user and user.rol in {RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value}
+    if not is_staff:
+        portal_cfg = db.query(ConfigPortal).first()
+        permitir = portal_cfg.permitir_lista_fallecidos if portal_cfg else False
+        if not permitir:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="El acceso público a la lista de fallecidos está deshabilitado por administración municipal. Los visitantes tienen acceso exclusivo a la verificación de certificados."
+            )
 
     query = db.query(Inhumacion).join(Inhumacion.fallecido).join(Inhumacion.ubicacion)
 

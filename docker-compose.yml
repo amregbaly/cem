@@ -53,7 +53,7 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8001
     ports:
-      - "3002:3000"
+      - "5011:3000"
 
 volumes:
   postgres_data:

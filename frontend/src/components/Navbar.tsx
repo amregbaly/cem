@@ -19,7 +19,8 @@ import {
   X,
   Clock,
   HardHat,
-  FileCheck
+  FileCheck,
+  UserCog
 } from "lucide-react";
 import ThemeCustomizerModal from "./ThemeCustomizerModal";
 
@@ -38,6 +39,7 @@ export default function Navbar() {
     { href: "/inhumaciones", label: t("navInhumaciones"), icon: Users },
     { href: "/auditoria", label: t("navAuditoria"), icon: ShieldCheck },
     { href: "/migracion", label: t("navMigracion"), icon: Database },
+    { href: "/admin", label: t("navAdmin"), icon: UserCog },
   ];
 
   return (

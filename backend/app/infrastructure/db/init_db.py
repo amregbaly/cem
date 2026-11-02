@@ -7,6 +7,11 @@ from app.domain.models import (
     Usuario,
     RolUsuario,
     ConfigTema,
+    Grupo,
+    GrupoPermiso,
+    ModuloSistema,
+    NivelAcceso,
+    ConfigPortal,
 )
 from app.core.security import get_password_hash
 
@@ -43,6 +48,22 @@ def init_db(db: Session) -> None:
             except Exception:
                 pass
 
+        # Ensure lockout, audit & group columns exist on core.tb_usuario
+        for col, col_type in [
+            ("intentos_fallidos", "INTEGER DEFAULT 0"),
+            ("bloqueado_hasta", "TIMESTAMP"),
+            ("ultimo_cambio_clave", "TIMESTAMP"),
+            ("grupo_id", "INTEGER")
+        ]:
+            try:
+                if "postgresql" in str(bind.url):
+                    conn.execute(text(f"ALTER TABLE core.tb_usuario ADD COLUMN IF NOT EXISTS {col} {col_type};"))
+                else:
+                    conn.execute(text(f"ALTER TABLE core.tb_usuario ADD COLUMN {col} {col_type};"))
+                conn.commit()
+            except Exception:
+                pass
+
     # 3. Seed Cemeteries
     cem_sc = db.query(Cementerio).filter_by(codigo="SAN_CARLOS").first()
     if not cem_sc:
@@ -68,45 +89,378 @@ def init_db(db: Session) -> None:
         )
         db.add(cem_cpt)
 
-    # 4. Seed Default Users
-    admin_user = db.query(Usuario).filter_by(username="admin").first()
-    if not admin_user:
-        admin_user = Usuario(
-            username="admin",
-            email="admin@munisancarlos.cl",
-            rut="11111111-1",
-            nombre_completo="Administrador General Municipal",
-            hashed_password=get_password_hash("AdminCem2026!"),
-            rol=RolUsuario.ADMINISTRADOR.value,
-            activo=True
-        )
-        db.add(admin_user)
+    # 4. Seed Default Users (Ley 21.719 Compliance: Minimum 2 Admin, 8 Administrativo, 20 Visita)
+    nominative_users = [
+        # --- ADMINISTRADORES (Min 2) ---
+        {
+            "username": "admin",
+            "email": "admin@munisancarlos.cl",
+            "rut": "11111111-1",
+            "nombre_completo": "Carlos Aránguiz Peña (Administrador General)",
+            "password": "AdminCem2026!",
+            "rol": RolUsuario.ADMINISTRADOR.value
+        },
+        {
+            "username": "supervisor_admin",
+            "email": "supervisor.admin@munisancarlos.cl",
+            "rut": "12345678-5",
+            "nombre_completo": "Patricia Contreras Lagos (Supervisora de Sistemas)",
+            "password": "SupervisorCem2026!",
+            "rol": RolUsuario.ADMINISTRADOR.value
+        },
 
-    admin_oper = db.query(Usuario).filter_by(username="operador").first()
-    if not admin_oper:
-        admin_oper = Usuario(
-            username="operador",
-            email="operador@munisancarlos.cl",
-            rut="22222222-2",
-            nombre_completo="Encargado de Cementerio",
-            hashed_password=get_password_hash("OperadorCem2026!"),
-            rol=RolUsuario.ADMINISTRATIVO.value,
-            activo=True
-        )
-        db.add(admin_oper)
+        # --- ADMINISTRATIVOS (8 Nominative Accounts) ---
+        {
+            "username": "operador",
+            "email": "operador@munisancarlos.cl",
+            "rut": "22222222-2",
+            "nombre_completo": "Luis Alberto Gómez Morales (Encargado Cementerio)",
+            "password": "OperadorCem2026!",
+            "rol": RolUsuario.ADMINISTRATIVO.value
+        },
+        {
+            "username": "registro_inhumaciones",
+            "email": "inhumaciones@munisancarlos.cl",
+            "rut": "13579246-8",
+            "nombre_completo": "Mariela Sepúlveda Riquelme (Oficial de Inhumaciones)",
+            "password": "RegistroCem2026!",
+            "rol": RolUsuario.ADMINISTRATIVO.value
+        },
+        {
+            "username": "caja_arriendos",
+            "email": "arriendos@munisancarlos.cl",
+            "rut": "14680135-7",
+            "nombre_completo": "Claudia Benavides Soto (Gestión de Concesiones)",
+            "password": "CajaArriendos2026!",
+            "rol": RolUsuario.ADMINISTRATIVO.value
+        },
+        {
+            "username": "maestros_obras",
+            "email": "obras.cementerio@munisancarlos.cl",
+            "rut": "15791246-0",
+            "nombre_completo": "Jorge Valenzuela Pino (Coordinador Maestros Albañiles)",
+            "password": "MaestrosObras2026!",
+            "rol": RolUsuario.ADMINISTRATIVO.value
+        },
+        {
+            "username": "secretaria_san_carlos",
+            "email": "secretaria.sc@munisancarlos.cl",
+            "rut": "16802357-1",
+            "nombre_completo": "Ana María Fuentes Toledo (Secretaría San Carlos)",
+            "password": "SecretariaSC2026!",
+            "rol": RolUsuario.ADMINISTRATIVO.value
+        },
+        {
+            "username": "secretaria_cachapoal",
+            "email": "secretaria.cachapoal@munisancarlos.cl",
+            "rut": "17913468-2",
+            "nombre_completo": "Rosa Herminia Alarcón (Secretaría Cachapoal)",
+            "password": "SecretariaCP2026!",
+            "rol": RolUsuario.ADMINISTRATIVO.value
+        },
+        {
+            "username": "archivo_historico",
+            "email": "archivo@munisancarlos.cl",
+            "rut": "18024579-3",
+            "nombre_completo": "Manuel Jesús Baeza (Custodio Archivo Histórico)",
+            "password": "ArchivoCem2026!",
+            "rol": RolUsuario.ADMINISTRATIVO.value
+        },
+        {
+            "username": "operaciones_terreno",
+            "email": "terreno@munisancarlos.cl",
+            "rut": "19135680-4",
+            "nombre_completo": "Hernán Carrasco Vera (Jefe de Cuadrilla de Campo)",
+            "password": "TerrenoCem2026!",
+            "rol": RolUsuario.ADMINISTRATIVO.value
+        },
 
-    visita_user = db.query(Usuario).filter_by(username="consulta").first()
-    if not visita_user:
-        visita_user = Usuario(
-            username="consulta",
-            email="consulta@munisancarlos.cl",
-            rut="33333333-3",
-            nombre_completo="Módulo de Consulta Ciudadana",
-            hashed_password=get_password_hash("ConsultaCem2026!"),
-            rol=RolUsuario.VISITA.value,
-            activo=True
-        )
-        db.add(visita_user)
+        # --- VISITA / CONSULTA (Min 20 Nominative Municipal Staff Accounts) ---
+        {
+            "username": "visita_alcaldia",
+            "email": "alcaldia.consulta@munisancarlos.cl",
+            "rut": "10234567-8",
+            "nombre_completo": "Gabinete Alcaldía Municipal",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_dideco",
+            "email": "dideco.consulta@munisancarlos.cl",
+            "rut": "10345678-6",
+            "nombre_completo": "DIDECO Desarrollo Comunitario",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_secplan",
+            "email": "secplan.consulta@munisancarlos.cl",
+            "rut": "10456789-4",
+            "nombre_completo": "SECPLAN Planificación Comunal",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_obras",
+            "email": "dom.consulta@munisancarlos.cl",
+            "rut": "10567890-2",
+            "nombre_completo": "Dirección de Obras Municipales",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_transito",
+            "email": "transito.consulta@munisancarlos.cl",
+            "rut": "10678901-0",
+            "nombre_completo": "Dirección de Tránsito",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_juridico",
+            "email": "juridico.consulta@munisancarlos.cl",
+            "rut": "10789012-9",
+            "nombre_completo": "Dirección de Asesoría Jurídica",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_salud",
+            "email": "salud.consulta@munisancarlos.cl",
+            "rut": "10890123-7",
+            "nombre_completo": "Departamento de Salud Municipal",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_social",
+            "email": "social.consulta@munisancarlos.cl",
+            "rut": "10901234-5",
+            "nombre_completo": "Asistencia Social Municipal",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_caja",
+            "email": "tesoreria.consulta@munisancarlos.cl",
+            "rut": "11012345-3",
+            "nombre_completo": "Caja Central Tesorería",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_oirs",
+            "email": "oirs.consulta@munisancarlos.cl",
+            "rut": "11123456-1",
+            "nombre_completo": "Oficina OIRS Informaciones",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_atencion01",
+            "email": "atencion01@munisancarlos.cl",
+            "rut": "11234567-K",
+            "nombre_completo": "Atención Ciudadana Ventanilla 1",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_atencion02",
+            "email": "atencion02@munisancarlos.cl",
+            "rut": "11345678-8",
+            "nombre_completo": "Atención Ciudadana Ventanilla 2",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_atencion03",
+            "email": "atencion03@munisancarlos.cl",
+            "rut": "11456789-6",
+            "nombre_completo": "Atención Ciudadana Ventanilla 3",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_atencion04",
+            "email": "atencion04@munisancarlos.cl",
+            "rut": "11567890-4",
+            "nombre_completo": "Atención Ciudadana Ventanilla 4",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_atencion05",
+            "email": "atencion05@munisancarlos.cl",
+            "rut": "11678901-2",
+            "nombre_completo": "Atención Ciudadana Ventanilla 5",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_medioambiente",
+            "email": "ambiente.consulta@munisancarlos.cl",
+            "rut": "11789012-0",
+            "nombre_completo": "Dirección de Medio Ambiente",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_rentas",
+            "email": "rentas.consulta@munisancarlos.cl",
+            "rut": "11890123-9",
+            "nombre_completo": "Departamento de Rentas y Patentes",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_cultura",
+            "email": "cultura.consulta@munisancarlos.cl",
+            "rut": "11901234-7",
+            "nombre_completo": "Unidad de Patrimonio Histórico",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "visita_seguridad",
+            "email": "seguridad.consulta@munisancarlos.cl",
+            "rut": "12012345-5",
+            "nombre_completo": "Dirección de Seguridad Pública",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        },
+        {
+            "username": "consulta",
+            "email": "consulta@munisancarlos.cl",
+            "rut": "33333333-3",
+            "nombre_completo": "Módulo de Consulta Ciudadana",
+            "password": "ConsultaCem2026!",
+            "rol": RolUsuario.VISITA.value
+        }
+    ]
+
+    for u_data in nominative_users:
+        existing = db.query(Usuario).filter_by(username=u_data["username"]).first()
+        if not existing:
+            new_user = Usuario(
+                username=u_data["username"],
+                email=u_data["email"],
+                rut=u_data["rut"],
+                nombre_completo=u_data["nombre_completo"],
+                hashed_password=get_password_hash(u_data["password"]),
+                rol=u_data["rol"],
+                activo=True
+            )
+            db.add(new_user)
+
+    db.flush()
+
+    # 4.5 Seed Default Municipal Groups & Granular Permission Matrix (RBAC Ley 21.719)
+    default_groups_data = [
+        {
+            "nombre": "Administradores Generales",
+            "descripcion": "Acceso total de lectura y escritura para auditoría, seguridad y configuración institucional.",
+            "es_sistema": True,
+            "permisos": {
+                ModuloSistema.INHUMACIONES.value: NivelAcceso.WRITE.value,
+                ModuloSistema.UBICACIONES.value: NivelAcceso.WRITE.value,
+                ModuloSistema.ARRIENDOS.value: NivelAcceso.WRITE.value,
+                ModuloSistema.CERTIFICADOS.value: NivelAcceso.WRITE.value,
+                ModuloSistema.CAMPO.value: NivelAcceso.WRITE.value,
+                ModuloSistema.AUDITORIA.value: NivelAcceso.WRITE.value,
+                ModuloSistema.CONFIGURACION.value: NivelAcceso.WRITE.value,
+                ModuloSistema.USUARIOS.value: NivelAcceso.WRITE.value,
+            }
+        },
+        {
+            "nombre": "Operadores de Cementerio",
+            "descripcion": "Gestión operativa completa de sepultaciones, catastro GIS, arriendos y certificados.",
+            "es_sistema": True,
+            "permisos": {
+                ModuloSistema.INHUMACIONES.value: NivelAcceso.WRITE.value,
+                ModuloSistema.UBICACIONES.value: NivelAcceso.WRITE.value,
+                ModuloSistema.ARRIENDOS.value: NivelAcceso.WRITE.value,
+                ModuloSistema.CERTIFICADOS.value: NivelAcceso.WRITE.value,
+                ModuloSistema.CAMPO.value: NivelAcceso.WRITE.value,
+                ModuloSistema.AUDITORIA.value: NivelAcceso.READ.value,
+                ModuloSistema.CONFIGURACION.value: NivelAcceso.READ.value,
+                ModuloSistema.USUARIOS.value: NivelAcceso.NONE.value,
+            }
+        },
+        {
+            "nombre": "Cajeros y Concesiones",
+            "descripcion": "Recaudación municipal, cobro de arriendos, renovaciones y emisión de certificados.",
+            "es_sistema": True,
+            "permisos": {
+                ModuloSistema.INHUMACIONES.value: NivelAcceso.READ.value,
+                ModuloSistema.UBICACIONES.value: NivelAcceso.READ.value,
+                ModuloSistema.ARRIENDOS.value: NivelAcceso.WRITE.value,
+                ModuloSistema.CERTIFICADOS.value: NivelAcceso.WRITE.value,
+                ModuloSistema.CAMPO.value: NivelAcceso.NONE.value,
+                ModuloSistema.AUDITORIA.value: NivelAcceso.READ.value,
+                ModuloSistema.CONFIGURACION.value: NivelAcceso.NONE.value,
+                ModuloSistema.USUARIOS.value: NivelAcceso.NONE.value,
+            }
+        },
+        {
+            "nombre": "Cuadrillas y Obras en Terreno",
+            "descripcion": "Órdenes de trabajo, exhumaciones, traslados y mantención de sepulturas.",
+            "es_sistema": True,
+            "permisos": {
+                ModuloSistema.INHUMACIONES.value: NivelAcceso.READ.value,
+                ModuloSistema.UBICACIONES.value: NivelAcceso.WRITE.value,
+                ModuloSistema.ARRIENDOS.value: NivelAcceso.NONE.value,
+                ModuloSistema.CERTIFICADOS.value: NivelAcceso.NONE.value,
+                ModuloSistema.CAMPO.value: NivelAcceso.WRITE.value,
+                ModuloSistema.AUDITORIA.value: NivelAcceso.NONE.value,
+                ModuloSistema.CONFIGURACION.value: NivelAcceso.NONE.value,
+                ModuloSistema.USUARIOS.value: NivelAcceso.NONE.value,
+            }
+        },
+        {
+            "nombre": "Atención Ciudadana y Auditoría",
+            "descripcion": "Módulos de consulta pública y fiscalización (causa de defunción anonimizada).",
+            "es_sistema": True,
+            "permisos": {
+                ModuloSistema.INHUMACIONES.value: NivelAcceso.READ.value,
+                ModuloSistema.UBICACIONES.value: NivelAcceso.READ.value,
+                ModuloSistema.ARRIENDOS.value: NivelAcceso.READ.value,
+                ModuloSistema.CERTIFICADOS.value: NivelAcceso.READ.value,
+                ModuloSistema.CAMPO.value: NivelAcceso.READ.value,
+                ModuloSistema.AUDITORIA.value: NivelAcceso.READ.value,
+                ModuloSistema.CONFIGURACION.value: NivelAcceso.NONE.value,
+                ModuloSistema.USUARIOS.value: NivelAcceso.NONE.value,
+            }
+        }
+    ]
+
+    for g_info in default_groups_data:
+        grp = db.query(Grupo).filter_by(nombre=g_info["nombre"]).first()
+        if not grp:
+            grp = Grupo(
+                nombre=g_info["nombre"],
+                descripcion=g_info["descripcion"],
+                es_sistema=g_info["es_sistema"]
+            )
+            db.add(grp)
+            db.flush()
+            for mod, acc in g_info["permisos"].items():
+                db.add(GrupoPermiso(grupo_id=grp.id, modulo=mod, acceso=acc))
+
+    db.flush()
+
+    # Link default users to groups based on their role if unassigned
+    grp_admin = db.query(Grupo).filter_by(nombre="Administradores Generales").first()
+    grp_oper = db.query(Grupo).filter_by(nombre="Operadores de Cementerio").first()
+    grp_visita = db.query(Grupo).filter_by(nombre="Atención Ciudadana y Auditoría").first()
+
+    if grp_admin:
+        db.query(Usuario).filter(Usuario.rol == RolUsuario.ADMINISTRADOR.value, Usuario.grupo_id.is_(None)).update({Usuario.grupo_id: grp_admin.id}, synchronize_session=False)
+    if grp_oper:
+        db.query(Usuario).filter(Usuario.rol == RolUsuario.ADMINISTRATIVO.value, Usuario.grupo_id.is_(None)).update({Usuario.grupo_id: grp_oper.id}, synchronize_session=False)
+    if grp_visita:
+        db.query(Usuario).filter(Usuario.rol == RolUsuario.VISITA.value, Usuario.grupo_id.is_(None)).update({Usuario.grupo_id: grp_visita.id}, synchronize_session=False)
+
+    db.commit()
 
     # 5. Seed Themes (Day, Night, Custom Presets)
     default_themes = [
@@ -459,6 +813,17 @@ def seed_spatial_sample_data(db: Session) -> None:
         ]
         for t in tasks_seed:
             db.add(t)
+
+    # 13. Seed ConfigPortal (Default: Visitors only see certificates, death list hidden by default)
+    portal_cfg = db.query(ConfigPortal).first()
+    if not portal_cfg:
+        portal_cfg = ConfigPortal(
+            permitir_lista_fallecidos=False,
+            permitir_busqueda_publica=False,
+            titulo_portal="Portal Ciudadano de Certificados Municipales",
+            mensaje_portal="Verificación digital y autenticidad de certificados para los Cementerios de San Carlos y Cachapoal (Ley 21.719)."
+        )
+        db.add(portal_cfg)
 
     db.commit()
 

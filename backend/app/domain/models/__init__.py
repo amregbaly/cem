@@ -12,10 +12,13 @@ from app.domain.models.audit import LogAuditoria
 from app.domain.models.migration import ExcepcionMigracion, ReconciliacionMigracion
 from app.domain.models.certificado import Certificado, TipoCertificado, EstadoCertificado
 from app.domain.models.agenda_terreno import TareaTerreno, TipoTareaTerreno, EstadoTareaTerreno
+from app.domain.models.grupo import Grupo, GrupoPermiso, ModuloSistema, NivelAcceso
+from app.domain.models.portal import ConfigPortal
 
 __all__ = [
     "Base",
     "TimestampMixin",
+    "ConfigPortal",
     "Cementerio",
     "Ubicacion",
     "TipoUbicacion",
@@ -42,4 +45,9 @@ __all__ = [
     "TareaTerreno",
     "TipoTareaTerreno",
     "EstadoTareaTerreno",
+    "Grupo",
+    "GrupoPermiso",
+    "ModuloSistema",
+    "NivelAcceso",
 ]
+

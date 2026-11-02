@@ -24,12 +24,15 @@ class NotificarRequest(BaseModel):
 def get_vencimientos_radar(
     cementerio_id: Optional[int] = Query(None),
     dias_filtro: Optional[int] = Query(None, description="Filter: 30, 60, 90, or -1 (all expired)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: Optional[Usuario] = Depends(get_current_user_optional)
 ):
     """
     Automated Lease Engine: Computes lease expiration thresholds (Expired, 30d, 60d, 90d).
     Powers the administrative renewal dashboard and multi-channel alerts.
+    Enforces Ley 21.719 privacy redactions on contact data for Visita profile.
     """
+    is_staff = user and user.rol in {RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value}
     query = db.query(Derecho)
     if cementerio_id:
         ubic_sub = db.query(Ubicacion.id).filter(Ubicacion.cementerio_id == cementerio_id)
@@ -54,9 +57,9 @@ def get_vencimientos_radar(
             "codigo_ubicacion": d.ubicacion.codigo_completo,
             "cementerio": d.ubicacion.cementerio.nombre,
             "titular": d.titular.nombre_completo,
-            "rut_titular": d.titular.rut,
-            "telefono": d.titular.celular or d.titular.telefono,
-            "email": d.titular.email,
+            "rut_titular": d.titular.rut if is_staff else "[CONFIDENCIAL LEY 21.719]",
+            "telefono": (d.titular.celular or d.titular.telefono) if is_staff else "[CONFIDENCIAL]",
+            "email": d.titular.email if is_staff else "[CONFIDENCIAL]",
             "tipo_derecho": d.tipo_derecho,
             "periodo_arriendo": d.periodo_arriendo,
             "fecha_inicio": d.fecha_inicio.isoformat() if d.fecha_inicio else None,

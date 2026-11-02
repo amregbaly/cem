@@ -27,7 +27,7 @@ def generate_certificate_pdf(
     autoridad_emisora: str = "Dirección de Cementerios Municipales de San Carlos y Cachapoal",
     funcionario_emisor: str = "Encargado de Registros Municipales",
     observaciones: Optional[str] = None,
-    verify_base_url: str = "http://localhost:3002/verify/certificate"
+    verify_base_url: str = "http://localhost:5011/verify/certificate"
 ) -> Tuple[bytes, str, str]:
     """
     Generates a formal municipal PDF certificate with embedded QR code.

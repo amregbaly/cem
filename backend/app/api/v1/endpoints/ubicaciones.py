@@ -280,7 +280,9 @@ def get_ubicacion_detalle(
             "tipo_derecho": der.tipo_derecho,
             "periodo_arriendo": der.periodo_arriendo,
             "titular": der.titular.nombre_completo,
-            "rut_titular": der.titular.rut,
+            "rut_titular": der.titular.rut if is_admin_or_staff else "[CONFIDENCIAL LEY 21.719]",
+            "telefono_titular": der.titular.telefono if is_admin_or_staff else "[CONFIDENCIAL]",
+            "direccion_titular": der.titular.direccion if is_admin_or_staff else "[CONFIDENCIAL]",
             "fecha_inicio": der.fecha_inicio.isoformat() if der.fecha_inicio else None,
             "fecha_vencimiento": der.fecha_vencimiento.isoformat() if der.fecha_vencimiento else None,
             "estado": der.estado,
@@ -373,7 +375,9 @@ def get_ubicacion_historial(
             "folio_documento": der.folio_recibo or f"DER-{der.id}",
             "detalles": {
                 "titular": der.titular.nombre_completo,
-                "rut_titular": der.titular.rut,
+                "rut_titular": der.titular.rut if is_staff else "[CONFIDENCIAL LEY 21.719]",
+                "telefono_titular": der.titular.telefono if is_staff else "[CONFIDENCIAL]",
+                "direccion_titular": der.titular.direccion if is_staff else "[CONFIDENCIAL]",
                 "estado": der.estado,
                 "fecha_inicio": der.fecha_inicio.isoformat() if der.fecha_inicio else None,
                 "fecha_vencimiento": der.fecha_vencimiento.isoformat() if der.fecha_vencimiento else None,
@@ -405,7 +409,9 @@ def get_ubicacion_historial(
         latest_der = ubic.derechos[-1]
         titular_actual = {
             "nombre": latest_der.titular.nombre_completo,
-            "rut": latest_der.titular.rut,
+            "rut": latest_der.titular.rut if is_staff else "[CONFIDENCIAL LEY 21.719]",
+            "telefono": latest_der.titular.telefono if is_staff else "[CONFIDENCIAL]",
+            "direccion": latest_der.titular.direccion if is_staff else "[CONFIDENCIAL]",
             "tipo": latest_der.tipo_derecho,
             "periodo": latest_der.periodo_arriendo,
             "fecha_vencimiento": latest_der.fecha_vencimiento.isoformat() if latest_der.fecha_vencimiento else None,

@@ -444,19 +444,19 @@ export default function AdminTemasPage() {
                 className="px-4 py-2 rounded-xl font-bold text-xs text-white shadow-sm hover:opacity-90 transition-all"
                 style={{ backgroundColor: "var(--color-primary)" }}
               >
-                Botón Primario
+                {t("themeSampleButton")}
               </button>
               <button 
                 className="px-4 py-2 rounded-xl font-bold text-xs text-white shadow-sm hover:opacity-90 transition-all"
                 style={{ backgroundColor: "var(--color-secondary)" }}
               >
-                Botón Secundario
+                {t("themeSampleBadge")}
               </button>
               <button 
                 className="px-3.5 py-2 rounded-xl font-semibold text-xs border hover:opacity-80 transition-all"
                 style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
               >
-                Botón Neutro
+                {t("themeSampleCard")}
               </button>
             </div>
           </div>

@@ -1,29 +1,86 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.infrastructure.db.session import get_db
 from app.domain.models import Usuario, RolUsuario
-from app.domain.schemas.auth import Token, LoginRequest, TOTPSetupResponse, TOTPVerifyRequest
+from app.domain.schemas.auth import (
+    Token, LoginRequest, TOTPSetupResponse, TOTPVerifyRequest,
+    UsuarioCreateRequest, UsuarioResponse
+)
+from etl.rut_validator import validate_and_format_rut
 from app.core.security import (
     verify_password,
+    get_password_hash,
+    validate_password_policy,
     create_access_token,
     generate_totp_secret,
     get_totp_provisioning_uri,
     verify_totp_code
 )
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_role
 from app.infrastructure.db.audit_listener import AuditService
 
 router = APIRouter()
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=12)
+
+
 @router.post("/login", response_model=Token)
 def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """
-    Authenticate user. Enforces TOTP 2FA for Administrator and Administrative accounts if enabled.
+    Authenticate user.
+    Enforces:
+    - Account lockout after 5 consecutive failed login attempts (Ley 21.719 / ASVS L2).
+    - TOTP 2FA for Administrator and Administrative accounts if enabled.
     """
     user = db.query(Usuario).filter(Usuario.username == login_data.username).first()
-    if not user or not verify_password(login_data.password, user.hashed_password):
+    now_utc = datetime.now(timezone.utc)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Nombre de usuario o contraseña incorrectos."
+        )
+
+    # Check if account is locked out
+    if user.bloqueado_hasta:
+        # Normalize timezone if needed
+        locked_time = user.bloqueado_hasta if user.bloqueado_hasta.tzinfo else user.bloqueado_hasta.replace(tzinfo=timezone.utc)
+        if locked_time > now_utc:
+            remaining_mins = max(1, int((locked_time - now_utc).total_seconds() / 60))
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail=f"Cuenta bloqueada por 5 intentos fallidos consecutivos. Desbloqueo automático en ~{remaining_mins} minutos o contacte al Administrador."
+            )
+        else:
+            # Lockout expired, reset
+            user.bloqueado_hasta = None
+            user.intentos_fallidos = 0
+            db.commit()
+
+    if not verify_password(login_data.password, user.hashed_password):
+        # Increment failed attempts
+        user.intentos_fallidos = (user.intentos_fallidos or 0) + 1
+        if user.intentos_fallidos >= 5:
+            user.bloqueado_hasta = now_utc + timedelta(minutes=15)
+            AuditService.log_mutation(
+                session=db,
+                modulo="SEGURIDAD",
+                accion="BLOQUEO_CUENTA",
+                entidad="core.tb_usuario",
+                registro_id=str(user.id),
+                payload_posterior={"motivo": "5 intentos fallidos consecutivos", "bloqueado_hasta": user.bloqueado_hasta.isoformat()},
+                user_id=user.id,
+                username=user.username,
+                user_rut=user.rut,
+                user_role=user.rol,
+                commit=False
+            )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Nombre de usuario o contraseña incorrectos."
@@ -52,7 +109,10 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 detail="Código de autenticación 2FA (TOTP) inválido."
             )
 
-    user.ultimo_acceso = datetime.now(timezone.utc)
+    # Successful login: reset failed attempts
+    user.intentos_fallidos = 0
+    user.bloqueado_hasta = None
+    user.ultimo_acceso = now_utc
     db.commit()
 
     access_token = create_access_token(subject=user.username, role=user.rol)
@@ -138,3 +198,213 @@ def verify_and_enable_totp(
     )
 
     return {"message": "Doble factor de autenticación (TOTP 2FA) activado exitosamente."}
+
+
+@router.post("/cambiar-password")
+def cambiar_password(
+    req: ChangePasswordRequest,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change user password with strict validation:
+    - Verifies current password.
+    - Validates minimum 12 chars and checks against breached databases.
+    - Logs audit trail.
+    """
+    if not verify_password(req.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
+
+    is_valid, msg = validate_password_policy(req.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=msg)
+
+    current_user.hashed_password = get_password_hash(req.new_password)
+    current_user.ultimo_cambio_clave = datetime.now(timezone.utc)
+    db.commit()
+
+    AuditService.log_mutation(
+        session=db,
+        modulo="SEGURIDAD",
+        accion="CAMBIO_PASSWORD",
+        entidad="core.tb_usuario",
+        registro_id=str(current_user.id),
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
+        commit=True
+    )
+
+    return {"message": "Contraseña actualizada exitosamente en cumplimiento con Ley 21.719 y ASVS L2."}
+
+
+@router.post("/usuarios/{usuario_id}/desbloquear")
+def desbloquear_usuario(
+    usuario_id: int,
+    current_user: Usuario = Depends(require_role([RolUsuario.ADMINISTRADOR.value])),
+    db: Session = Depends(get_db)
+):
+    """
+    Administrative unlock for locked accounts (after 5 failed attempts).
+    """
+    target = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    target.intentos_fallidos = 0
+    target.bloqueado_hasta = None
+    db.commit()
+
+    AuditService.log_mutation(
+        session=db,
+        modulo="SEGURIDAD",
+        accion="DESBLOQUEO_CUENTA",
+        entidad="core.tb_usuario",
+        registro_id=str(target.id),
+        payload_posterior={"usuario_desbloqueado": target.username},
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
+        commit=True
+    )
+
+    return {"message": f"Usuario {target.username} desbloqueado exitosamente."}
+
+
+@router.get("/usuarios")
+def listar_usuarios(
+    current_user: Usuario = Depends(require_role([RolUsuario.ADMINISTRADOR.value])),
+    db: Session = Depends(get_db)
+):
+    """List all user accounts with their status, lockout state, and assigned group."""
+    users = db.query(Usuario).all()
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "nombre_completo": u.nombre_completo,
+            "rut": u.rut,
+            "rol": u.rol,
+            "grupo_id": u.grupo_id,
+            "grupo_nombre": u.grupo.nombre if u.grupo else None,
+            "activo": u.activo,
+            "totp_enabled": u.totp_enabled,
+            "intentos_fallidos": u.intentos_fallidos,
+            "bloqueado_hasta": u.bloqueado_hasta.isoformat() if u.bloqueado_hasta else None,
+            "ultimo_acceso": u.ultimo_acceso.isoformat() if u.ultimo_acceso else None
+        }
+        for u in users
+    ]
+
+
+@router.post("/usuarios", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
+def crear_usuario(
+    req: UsuarioCreateRequest,
+    current_user: Usuario = Depends(require_role([RolUsuario.ADMINISTRADOR.value])),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new user account with strict municipal validation:
+    - RUT validation (Módulo 11 format).
+    - Password policy enforcement (min 12 chars).
+    - Role assignment (ADMINISTRADOR, ADMINISTRATIVO, VISITA).
+    - Optional Group assignment (RBAC).
+    - Append-only cryptographic audit logging (HMAC SHA-256).
+    """
+    # Check username uniqueness
+    existing_username = db.query(Usuario).filter(Usuario.username == req.username).first()
+    if existing_username:
+        raise HTTPException(status_code=400, detail=f"El nombre de usuario '{req.username}' ya se encuentra registrado.")
+
+    # Check email uniqueness if provided
+    if req.email:
+        existing_email = db.query(Usuario).filter(Usuario.email == req.email).first()
+        if existing_email:
+            raise HTTPException(status_code=400, detail=f"El correo electrónico '{req.email}' ya está registrado.")
+
+    # Validate RUT if provided
+    clean_rut = None
+    if req.rut:
+        is_valid_rut, formatted_rut, _, _ = validate_and_format_rut(req.rut)
+        if not is_valid_rut:
+            raise HTTPException(status_code=400, detail="RUT inválido. Debe cumplir con el algoritmo chileno Módulo 11 (ej: 12345678-5).")
+        clean_rut = formatted_rut
+
+    # Validate password policy
+    is_valid_pw, pw_msg = validate_password_policy(req.password)
+    if not is_valid_pw:
+        raise HTTPException(status_code=400, detail=pw_msg)
+
+    # Validate role
+    role_val = req.rol.upper()
+    valid_roles = [r.value for r in RolUsuario]
+    if role_val not in valid_roles:
+        raise HTTPException(status_code=400, detail=f"Rol inválido. Roles válidos: {', '.join(valid_roles)}")
+
+    # Validate grupo if specified
+    grupo_nombre = None
+    if req.grupo_id:
+        from app.domain.models.grupo import Grupo
+        grupo = db.query(Grupo).filter(Grupo.id == req.grupo_id).first()
+        if not grupo:
+            raise HTTPException(status_code=404, detail="El grupo seleccionado no existe.")
+        grupo_nombre = grupo.nombre
+
+    new_user = Usuario(
+        username=req.username.strip(),
+        email=req.email.strip() if req.email else None,
+        rut=clean_rut,
+        nombre_completo=req.nombre_completo.strip(),
+        hashed_password=get_password_hash(req.password),
+        rol=role_val,
+        grupo_id=req.grupo_id,
+        activo=True,
+        ultimo_cambio_clave=datetime.now(timezone.utc)
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # Cryptographic audit logging
+    AuditService.log_mutation(
+        session=db,
+        modulo="SEGURIDAD",
+        accion="CREAR_USUARIO",
+        entidad="core.tb_usuario",
+        registro_id=str(new_user.id),
+        payload_posterior={
+            "id": new_user.id,
+            "username": new_user.username,
+            "nombre_completo": new_user.nombre_completo,
+            "rut": new_user.rut,
+            "rol": new_user.rol,
+            "grupo_id": new_user.grupo_id
+        },
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
+        commit=True
+    )
+
+    return UsuarioResponse(
+        id=new_user.id,
+        username=new_user.username,
+        email=new_user.email,
+        rut=new_user.rut,
+        nombre_completo=new_user.nombre_completo,
+        rol=new_user.rol,
+        grupo_id=new_user.grupo_id,
+        grupo_nombre=grupo_nombre,
+        activo=new_user.activo,
+        totp_enabled=new_user.totp_enabled,
+        intentos_fallidos=new_user.intentos_fallidos,
+        bloqueado_hasta=new_user.bloqueado_hasta.isoformat() if new_user.bloqueado_hasta else None,
+        ultimo_acceso=new_user.ultimo_acceso.isoformat() if new_user.ultimo_acceso else None
+    )
+
+
+

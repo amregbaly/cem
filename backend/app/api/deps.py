@@ -55,13 +55,20 @@ def get_current_user(
     return user
 
 
-def require_role(*roles: str):
+def require_role(*roles):
     """Enforces that current user belongs to one of the specified roles."""
+    allowed = set()
+    for r in roles:
+        if isinstance(r, (list, tuple, set)):
+            allowed.update(r)
+        else:
+            allowed.add(r)
+
     def role_checker(current_user: Usuario = Depends(get_current_user)) -> Usuario:
-        if current_user.rol not in roles:
+        if current_user.rol not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Operación restringida. Se requiere rol: {', '.join(roles)}"
+                detail=f"Operación restringida. Se requiere rol: {', '.join(allowed)}"
             )
         return current_user
     return role_checker

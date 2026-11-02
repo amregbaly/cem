@@ -43,6 +43,7 @@ export default function CertificateVerificationPage() {
   const params = useParams();
   const folioParam = params?.folio as string;
 
+  const { t } = useLanguage();
   const { isDarkMode } = useTheme();
 
   const [folio, setFolio] = useState<string>(folioParam || "");
@@ -91,18 +92,18 @@ export default function CertificateVerificationPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
   return (
-    <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto space-y-8 animate-fadeIn">
       {/* Civic Municipal Header */}
       <div className="text-center space-y-3">
         <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
           <ShieldCheck className="w-4 h-4" />
-          <span>Portal Oficial de Autenticidad Documental</span>
+          <span>{t("certPortalTitle")}</span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
-          Verificación de Certificado Municipal
+          {t("certVerificationTitle")}
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
-          Validación pública con firma electrónica avanzada y estampado de tiempo según Ley N° 19.799 e I. Municipalidad de San Carlos.
+          {t("certVerificationSubtitle")}
         </p>
       </div>
 
@@ -117,15 +118,16 @@ export default function CertificateVerificationPage() {
             type="text"
             value={folio}
             onChange={(e) => setFolio(e.target.value)}
-            placeholder="Ingrese Folio (ej. CERT-2026-0089) o Token"
+            placeholder={t("certSearchPlaceholder")}
             className="w-full bg-transparent outline-none text-sm font-semibold uppercase"
             style={{ color: "var(--color-text)" }}
           />
           <button
             type="submit"
-            className="ml-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
+            className="ml-2 px-4 py-2 rounded-xl text-xs font-bold text-white transition-opacity hover:opacity-90 shadow-sm"
+            style={{ backgroundColor: "var(--color-primary)" }}
           >
-            Verificar
+            {t("certBtnVerify")}
           </button>
         </div>
       </form>
@@ -148,7 +150,7 @@ export default function CertificateVerificationPage() {
           </div>
           <div>
             <h3 className="text-lg font-bold text-rose-600 dark:text-rose-400">
-              Documento No Verificado
+              {t("certStatusAnulado")}
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 max-w-md mx-auto">
               {error}
@@ -171,7 +173,7 @@ export default function CertificateVerificationPage() {
               </div>
               <div>
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
-                  Documento Auténtico y Vigente
+                  {t("certStatusVigente")}
                 </span>
                 <h2 className="text-xl font-black" style={{ color: "var(--color-text)" }}>
                   Certificado de {cert.tipo_certificado}
@@ -182,10 +184,11 @@ export default function CertificateVerificationPage() {
               href={`${apiUrl}/api/v1/certificados/descargar/${cert.folio}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md"
+              className="flex items-center space-x-2 px-5 py-2.5 rounded-2xl text-white text-xs font-bold transition-all shadow-md hover:opacity-90"
+              style={{ backgroundColor: "var(--color-primary)" }}
             >
               <Download className="w-4 h-4" />
-              <span>Descargar PDF Oficial</span>
+              <span>{t("certBtnDownloadPDF")}</span>
             </a>
           </div>
 
@@ -196,7 +199,7 @@ export default function CertificateVerificationPage() {
               <div className="space-y-4">
                 <div className="p-4 rounded-2xl border bg-gray-50/50 dark:bg-gray-800/30" style={{ borderColor: "var(--color-border)" }}>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Folio Municipal</span>
-                  <p className="text-lg font-black font-mono text-blue-600 dark:text-blue-400">
+                  <p className="text-lg font-black font-mono" style={{ color: "var(--color-primary)" }}>
                     {cert.folio}
                   </p>
                   <p className="text-[11px] text-gray-400 font-mono mt-1">
@@ -205,7 +208,7 @@ export default function CertificateVerificationPage() {
                 </div>
 
                 <div className="p-4 rounded-2xl border" style={{ borderColor: "var(--color-border)" }}>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Cementerio y Ubicación</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{t("location")}</span>
                   <p className="text-sm font-bold mt-0.5" style={{ color: "var(--color-text)" }}>
                     {cert.cementerio}
                   </p>
@@ -218,7 +221,7 @@ export default function CertificateVerificationPage() {
               {/* Persons Involved */}
               <div className="space-y-4">
                 <div className="p-4 rounded-2xl border" style={{ borderColor: "var(--color-border)" }}>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Persona Fallecida (Inhumada)</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{t("deceasedName")}</span>
                   <p className="text-sm font-black mt-0.5" style={{ color: "var(--color-text)" }}>
                     {cert.fallecido_nombre || "NO REGISTRADO"}
                   </p>
@@ -228,7 +231,7 @@ export default function CertificateVerificationPage() {
                 </div>
 
                 <div className="p-4 rounded-2xl border bg-gray-50/50 dark:bg-gray-800/30" style={{ borderColor: "var(--color-border)" }}>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Titular de Concesión</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{t("drawerCurrentTitular")}</span>
                   <p className="text-sm font-bold mt-0.5" style={{ color: "var(--color-text)" }}>
                     {cert.titular_nombre || "I. Municipalidad de San Carlos"}
                   </p>
@@ -243,14 +246,14 @@ export default function CertificateVerificationPage() {
             <div className="p-4 rounded-2xl border bg-gray-50/50 dark:bg-gray-900/40 space-y-2" style={{ borderColor: "var(--color-border)" }}>
               <div className="flex items-center space-x-2 text-xs font-bold text-gray-500">
                 <Hash className="w-4 h-4 text-blue-500" />
-                <span>Huella Digital Criptográfica del Documento (SHA-256)</span>
+                <span>{t("certSha256")}</span>
               </div>
               <p className="text-[11px] font-mono font-bold break-all text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-black/30 p-2.5 rounded-xl border border-gray-200 dark:border-gray-800">
                 {cert.sha256_hash}
               </p>
               <div className="flex flex-wrap items-center justify-between text-[11px] text-gray-400 pt-1">
-                <span>Emisor: <strong>{cert.funcionario_emisor}</strong></span>
-                <span>Fecha Emisión: <strong>{cert.fecha_emision || "N/A"}</strong></span>
+                <span>{t("certIssuingOfficer")}: <strong>{cert.funcionario_emisor}</strong></span>
+                <span>{t("certIssueDate")}: <strong>{cert.fecha_emision || "N/A"}</strong></span>
               </div>
             </div>
 
@@ -260,8 +263,7 @@ export default function CertificateVerificationPage() {
               <div>
                 <strong className="block font-bold">Confidencialidad Ley N° 21.719 y Ley N° 20.584:</strong>
                 <span>
-                  Este portal público certifica exclusivamente la autenticidad y existencia legal del documento. 
-                  Los diagnósticos médicos y datos sensibles de contacto permanecen estrictamente resguardados en custodia municipal.
+                  {t("certPublicNotice")}
                 </span>
               </div>
             </div>

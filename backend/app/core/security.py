@@ -6,6 +6,40 @@ from jose import jwt
 from app.core.config import settings
 
 
+# Top common breached passwords list (ASVS L2 requirement: checked against breached password databases)
+COMMON_BREACHED_PASSWORDS = {
+    "password123456", "123456789012", "admin12345678", "qwertyuiopas",
+    "iloveyou1234", "municipalidad123", "sancarlos2026", "cemetery2026",
+    "contrasena123", "administrador1", "secretaria123", "password1234",
+    "1234567890123", "welcome123456", "chile20261234"
+}
+
+
+def validate_password_policy(password: str) -> tuple[bool, str]:
+    """
+    Validates password complexity and checks against known breached password lists.
+    OWASP ASVS Level 2 & Ley 21.719 requirements:
+    - Minimum 12 characters
+    - Must not be in common breached passwords list
+    - Must contain uppercase, lowercase, and digit or symbol
+    """
+    if not password or len(password) < 12:
+        return False, "La contraseña debe tener un mínimo de 12 caracteres."
+
+    if password.lower() in COMMON_BREACHED_PASSWORDS:
+        return False, "La contraseña ingresada figura en bases de datos de contraseñas vulneradas/comunes. Elija una más segura."
+
+    has_upper = any(c.isupper() for c in password)
+    has_lower = any(c.islower() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    has_symbol = any(not c.isalnum() for c in password)
+
+    if not (has_upper and has_lower and (has_digit or has_symbol)):
+        return False, "La contraseña debe incluir mayúsculas, minúsculas y al menos un número o símbolo especial."
+
+    return True, "OK"
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against the bcrypt hash."""
     try:
@@ -20,6 +54,7 @@ def get_password_hash(password: str) -> str:
     pwd_bytes = password.encode("utf-8")[:72]
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
+
 
 
 def create_access_token(

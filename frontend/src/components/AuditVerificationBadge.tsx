@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ShieldCheck, ShieldAlert, RefreshCw, CheckCircle2 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -17,13 +17,22 @@ export default function AuditVerificationBadge() {
   const { t } = useLanguage();
   const { isDarkMode } = useTheme();
   const [verifying, setVerifying] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [result, setResult] = useState<VerificationResponse>({
     valido: true,
     total_registros: 12,
     hash_cabecera: "8f4b1c93a20e98ff7b6a1204cd194e823b7e41d8a1c93b6e82a94f1c9a8e02d1",
     mensaje: "Cadena criptográfica intacta. 0 registros alterados.",
-    verificado_en: new Date().toLocaleTimeString()
+    verificado_en: undefined
   });
+
+  useEffect(() => {
+    setMounted(true);
+    setResult(prev => ({
+      ...prev,
+      verificado_en: new Date().toLocaleTimeString()
+    }));
+  }, []);
 
   const handleVerify = async () => {
     setVerifying(true);
@@ -122,8 +131,8 @@ export default function AuditVerificationBadge() {
         </div>
         <div>
           <span className="text-gray-400 block">Última Comprobación</span>
-          <span className="text-gray-500 dark:text-gray-400">
-            {result.verificado_en || "En tiempo real"}
+          <span className="text-gray-500 dark:text-gray-400" suppressHydrationWarning>
+            {mounted && result.verificado_en ? result.verificado_en : "En tiempo real"}
           </span>
         </div>
       </div>

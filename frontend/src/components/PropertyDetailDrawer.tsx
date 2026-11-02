@@ -244,31 +244,31 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
               onClick={() => setActiveTab("dossier")}
               className={`flex-1 py-3 text-center transition-all border-b-2 ${
                 activeTab === "dossier" 
-                  ? "border-blue-600 text-blue-600 dark:text-blue-400" 
+                  ? "border-blue-600 text-blue-600 dark:text-blue-400 font-bold" 
                   : "border-transparent text-gray-400 hover:text-gray-600"
               }`}
             >
-              Ficha Técnica
+              {t("drawerTechnicalSheet")}
             </button>
             <button
               onClick={() => setActiveTab("timeline")}
               className={`flex-1 py-3 text-center transition-all border-b-2 ${
                 activeTab === "timeline" 
-                  ? "border-blue-600 text-blue-600 dark:text-blue-400" 
+                  ? "border-blue-600 text-blue-600 dark:text-blue-400 font-bold" 
                   : "border-transparent text-gray-400 hover:text-gray-600"
               }`}
             >
-              Historial ({timeline.length})
+              {t("drawerHistory")} ({timeline.length})
             </button>
             <button
               onClick={() => setActiveTab("acciones")}
               className={`flex-1 py-3 text-center transition-all border-b-2 ${
                 activeTab === "acciones" 
-                  ? "border-blue-600 text-blue-600 dark:text-blue-400" 
+                  ? "border-blue-600 text-blue-600 dark:text-blue-400 font-bold" 
                   : "border-transparent text-gray-400 hover:text-gray-600"
               }`}
             >
-              Trámites
+              {t("drawerProcedures")}
             </button>
           </div>
 
@@ -288,7 +288,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                 <div className="p-4 rounded-2xl border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
                   <div className="flex items-center space-x-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
                     <User className="w-3.5 h-3.5" />
-                    <span>Ocupante Principal</span>
+                    <span>{t("drawerPrimaryOccupant")}</span>
                   </div>
                   {slot.ocupante_principal ? (
                     <div className="space-y-1">
@@ -301,7 +301,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                     </div>
                   ) : (
                     <p className="text-xs text-gray-400 italic">
-                      Sepultura desocupada actualmente. Lista para asignación o venta.
+                      {t("drawerNoOccupants")}
                     </p>
                   )}
                 </div>
@@ -310,11 +310,11 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                 <div className="p-4 rounded-2xl border" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
                   <div className="flex items-center space-x-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Titular y Régimen de Concesión</span>
+                    <span>{t("drawerTitularConcession")}</span>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="text-xs text-gray-400">Titular Actual:</span>
+                      <span className="text-xs text-gray-400">{t("drawerCurrentTitular")}:</span>
                       <p className="font-semibold" style={{ color: "var(--color-text)" }}>
                         {slot.titular_nombre || "I. Municipalidad de San Carlos (Fiscal)"}
                       </p>
@@ -324,13 +324,13 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                     </div>
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t text-xs" style={{ borderColor: "var(--color-border)" }}>
                       <div>
-                        <span className="text-gray-400">Vencimiento:</span>
+                        <span className="text-gray-400">{t("drawerExpiry")}:</span>
                         <p className="font-medium text-gray-700 dark:text-gray-300">
-                          {slot.fecha_vencimiento ? slot.fecha_vencimiento : "A Perpetuidad"}
+                          {slot.fecha_vencimiento ? slot.fecha_vencimiento : t("drawerPerpetual")}
                         </p>
                       </div>
                       <div>
-                        <span className="text-gray-400">Días Restantes:</span>
+                        <span className="text-gray-400">{t("drawerRemainingDays")}:</span>
                         <p className={`font-bold ${
                           (slot.dias_para_vencer ?? 999) < 0 
                             ? "text-rose-500" 
@@ -340,7 +340,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                         }`}>
                           {slot.dias_para_vencer !== null && slot.dias_para_vencer !== undefined 
                             ? `${slot.dias_para_vencer} días` 
-                            : "N/A (Perpetuo)"}
+                            : `N/A (${t("drawerPerpetual")})`}
                         </p>
                       </div>
                     </div>

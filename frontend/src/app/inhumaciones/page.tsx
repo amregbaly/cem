@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { 
   Users, 
   PlusCircle, 
@@ -13,7 +14,10 @@ import {
   Calendar,
   X,
   Building2,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  FileCheck2,
+  ArrowRight
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -51,10 +55,45 @@ export default function InhumacionesPage() {
   const { t } = useLanguage();
   const { isDarkMode } = useTheme();
 
+  const [mounted, setMounted] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [portalConfig, setPortalConfig] = useState({
+    permitir_lista_fallecidos: false,
+    titulo_portal: "Portal Ciudadano de Certificados Municipales",
+    mensaje_portal: ""
+  });
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
   const [search, setSearch] = useState("");
   const [cemeteryFilter, setCemeteryFilter] = useState<string>("all");
   const [maskCause, setMaskCause] = useState<boolean>(true);
   const [showModal, setShowModal] = useState<boolean>(false);
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+
+  useEffect(() => {
+    setMounted(true);
+    const savedUser = localStorage.getItem("cem_auth_user");
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch {
+        setCurrentUser(null);
+      }
+    }
+
+    fetch(`${apiUrl}/api/v1/portal/config`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.permitir_lista_fallecidos === "boolean") {
+          setPortalConfig(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setLoadingConfig(false);
+      });
+  }, [apiUrl]);
 
   // Form states for new burial
   const [formRut, setFormRut] = useState("");
@@ -195,6 +234,59 @@ export default function InhumacionesPage() {
     return matchesCem && matchesSearch;
   });
 
+  // If unauthenticated visitor and admin disallowed death list
+  if (mounted && !currentUser && !portalConfig.permitir_lista_fallecidos) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
+            {t("navInhumaciones")}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Registro Oficial de Sepultaciones de los Cementerios Municipales de San Carlos y Cachapoal
+          </p>
+        </div>
+
+        <div 
+          className="p-8 sm:p-12 rounded-3xl border text-center shadow-lg max-w-3xl mx-auto my-6"
+          style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+        >
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-5">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs font-bold mb-3">
+            <span>MODO RESTRINGIDO POR ADMINISTRACIÓN</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black mb-3" style={{ color: "var(--color-text)" }}>
+            Lista Nominal de Fallecidos No Disponible para Visitantes
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xl mx-auto leading-relaxed mb-8">
+            La administración municipal ha configurado el portal público en <strong>Modo Exclusivo de Certificados</strong> en cumplimiento de las normativas de protección de datos personales y sensibles (Ley 21.719). Para validar la autenticidad de un certificado o sepultura ya emitido, ingrese el folio o token en el verificador oficial.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/verify/certificate"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 rounded-2xl font-bold text-sm text-white shadow-md transition-all hover:opacity-90 active:scale-95"
+              style={{ backgroundColor: "var(--color-primary)" }}
+            >
+              <FileCheck2 className="w-4 h-4" />
+              <span>Verificar Certificado Oficial</span>
+              <ArrowRight className="w-4 h-4 ml-1" />
+            </Link>
+            <Link
+              href="/admin"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 rounded-2xl border font-bold text-sm transition-all hover:opacity-90"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+            >
+              <span>Acceso Funcionarios / Administrador</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       
@@ -209,14 +301,21 @@ export default function InhumacionesPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white shadow-md transition-all hover:opacity-90 active:scale-95 self-start sm:self-center"
-          style={{ backgroundColor: "var(--color-primary)" }}
-        >
-          <PlusCircle className="w-5 h-5" />
-          <span>{t("registerBurial")}</span>
-        </button>
+        {currentUser ? (
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white shadow-md transition-all hover:opacity-90 active:scale-95 self-start sm:self-center"
+            style={{ backgroundColor: "var(--color-primary)" }}
+          >
+            <PlusCircle className="w-5 h-5" />
+            <span>{t("registerBurial")}</span>
+          </button>
+        ) : (
+          <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-500/20">
+            <Eye className="w-4 h-4" />
+            <span>Vista Pública Habilitada por Administración</span>
+          </div>
+        )}
       </div>
 
       {/* Control Bar: Search, Filters, Privacy Mode */}
@@ -249,19 +348,33 @@ export default function InhumacionesPage() {
             <option value="Cachapoal" className="bg-white dark:bg-gray-800">Cachapoal</option>
           </select>
 
-          {/* Privacy Mask Toggle */}
-          <button
-            onClick={() => setMaskCause(!maskCause)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all hover:opacity-90"
-            style={{
-              borderColor: "var(--color-border)",
-              backgroundColor: maskCause ? "rgba(245, 158, 11, 0.1)" : "rgba(16, 185, 129, 0.1)",
-              color: maskCause ? "#D97706" : "#059669"
-            }}
-          >
-            {maskCause ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            <span>{maskCause ? t("toggleCausePrivacy") : "Causa Visible"}</span>
-          </button>
+          {/* Privacy Mask Toggle (Staff only) */}
+          {currentUser ? (
+            <button
+              onClick={() => setMaskCause(!maskCause)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all hover:opacity-90"
+              style={{
+                borderColor: "var(--color-border)",
+                backgroundColor: maskCause ? "rgba(245, 158, 11, 0.1)" : "rgba(16, 185, 129, 0.1)",
+                color: maskCause ? "#D97706" : "#059669"
+              }}
+            >
+              {maskCause ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              <span>{maskCause ? t("toggleCausePrivacy") : "Causa Visible (Personal)"}</span>
+            </button>
+          ) : (
+            <div 
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold"
+              style={{
+                borderColor: "var(--color-border)",
+                backgroundColor: "rgba(245, 158, 11, 0.1)",
+                color: "#D97706"
+              }}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Causa Reservada (Ley 21.719)</span>
+            </div>
+          )}
         </div>
       </div>
 

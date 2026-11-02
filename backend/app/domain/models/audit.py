@@ -36,7 +36,7 @@ class LogAuditoria(Base):
     
     # Mutation metadata
     modulo: Mapped[str] = mapped_column(String(50), nullable=False)
-    accion: Mapped[str] = mapped_column(String(20), nullable=False)  # INSERT, UPDATE, DELETE, LOGIN, EXPORT
+    accion: Mapped[str] = mapped_column(String(50), nullable=False)  # INSERT, UPDATE, DELETE, LOGIN, EXPORT
     entidad: Mapped[str] = mapped_column(String(60), nullable=False)  # Table name
     registro_id: Mapped[str] = mapped_column(String(50), nullable=False)
     
