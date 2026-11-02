@@ -259,8 +259,8 @@ class ExcelMigrator:
                 self._log_exception(sheet_name, row_idx, "R4_UBICACIONES", "ID_UBICACION", ubic_key, "Ubicación creada con código de migración provisional")
 
             # Holder Persona (R1, R2, R8)
-            rut_n = row_dict.get("VEN_RUTN")
-            rut_d = row_dict.get("VEN_RUTD")
+            rut_n = row_dict.get("RUT USUARIO") or row_dict.get("VEN_RUTN")
+            rut_d = row_dict.get("DIGITO VERIFICADOR RUT") or row_dict.get("VEN_RUTD")
             is_valid_rut, formatted_rut, cuerpo_num, dv_str = validate_and_format_rut(rut_n, rut_d)
 
             nom_raw = row_dict.get("NOMBRE USUARIO")
@@ -287,6 +287,9 @@ class ExcelMigrator:
                     apellido_paterno=name_info["apellido_paterno"],
                     apellido_materno=name_info["apellido_materno"],
                     nombre_completo=name_info["nombre_completo"],
+                    telefono=str(row_dict.get("TELEFONO", "")) if row_dict.get("TELEFONO") else None,
+                    celular=str(row_dict.get("CELULAR", "")) if row_dict.get("CELULAR") else None,
+                    email=str(row_dict.get("CORREO ELECTRÓNICO", "")) if row_dict.get("CORREO ELECTRÓNICO") else None,
                     direccion=str(row_dict.get("DIRECCION", "")) if row_dict.get("DIRECCION") else None,
                     origen_migracion=True,
                     source_sheet=sheet_name,
@@ -298,7 +301,7 @@ class ExcelMigrator:
                     self.persona_by_rut[formatted_rut] = holder_persona
 
             if not is_valid_rut and (rut_n or rut_d):
-                self._log_exception(sheet_name, row_idx, "R1_RUT", "VEN_RUTN/D", f"{rut_n}-{rut_d}", "RUT no validado (dígito verificador no coincide o formato irregular)")
+                self._log_exception(sheet_name, row_idx, "R1_RUT", "RUT USUARIO", f"{rut_n}-{rut_d}", "RUT no validado (dígito verificador no coincide o formato irregular)")
 
             # Right details (R3 Dates, PER_ID)
             per_id = str(row_dict.get("PER_ID", "4")).strip()
@@ -309,13 +312,23 @@ class ExcelMigrator:
                 "3": (TipoDerecho.ARRIENDO.value, PeriodoArriendo.VEINTE_ANOS.value),
                 "4": (TipoDerecho.ARRIENDO.value, PeriodoArriendo.CINCUENTA_ANOS.value),
                 "5": (TipoDerecho.PERPETUO.value, PeriodoArriendo.PERPETUO.value),
+                "6": (TipoDerecho.ARRIENDO.value, PeriodoArriendo.CINCUENTA_ANOS.value),
             }
             tipo_d, per_a = periodo_map.get(per_id, (TipoDerecho.ARRIENDO.value, PeriodoArriendo.CINCO_ANOS.value))
 
-            fecha_ingreso, _, _, _ = parse_date_value(row_dict.get("VEN_FECHA_INGRESO") or row_dict.get("AÑO"))
+            fecha_ingreso, _, _, _ = parse_date_value(row_dict.get("FECHA_ORDEN") or row_dict.get("VEN_FECHA_INGRESO") or row_dict.get("AÑO"))
             fecha_inicio = fecha_ingreso or date(2000, 1, 1)
             
-            fecha_fin, _, _, _ = parse_date_value(row_dict.get("VEN_FECHA_FIN_ARR"))
+            fecha_fin, _, _, _ = parse_date_value(row_dict.get("FECHA_VENCIMIENTO") or row_dict.get("VEN_FECHA_FIN_ARR"), allow_future=True)
+
+            # Calculate state based on expiration
+            today = date.today()
+            estado_calc = EstadoDerecho.VIGENTE.value
+            if tipo_d == TipoDerecho.ARRIENDO.value and fecha_fin:
+                if fecha_fin < today:
+                    estado_calc = EstadoDerecho.VENCIDO.value
+                elif (fecha_fin - today).days <= 90:
+                    estado_calc = EstadoDerecho.POR_VENCER.value
 
             derecho = Derecho(
                 ubicacion_id=ubicacion.id,
@@ -325,7 +338,7 @@ class ExcelMigrator:
                 fecha_inicio=fecha_inicio,
                 fecha_vencimiento=fecha_fin,
                 monto_pagado=float(row_dict.get("MONTO_PAGADO") or 0.0),
-                estado=EstadoDerecho.VIGENTE.value,
+                estado=estado_calc,
                 origen_migracion=True,
                 source_sheet=sheet_name,
                 source_row=row_idx,

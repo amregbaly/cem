@@ -9,7 +9,8 @@ MIN_VALID_YEAR = 1900
 
 def parse_date_value(
     raw_val: Any,
-    is_birth_date: bool = False
+    is_birth_date: bool = False,
+    allow_future: bool = False
 ) -> Tuple[Optional[date], bool, bool, Optional[str]]:
     """
     Parses dates from Excel serial floats/ints, datetime objects, or string representations.
@@ -73,8 +74,8 @@ def parse_date_value(
     if parsed == SENTINEL_DATE:
         return None, True, False, orig_str
 
-    # Rule R11: Dates before 1900 or after cut-off date (2026-03-31)
-    if parsed.year < MIN_VALID_YEAR or parsed > CUTOFF_DATE:
+    # Rule R11: Dates before 1900 or after cut-off date (unless allow_future=True for lease expiration)
+    if parsed.year < MIN_VALID_YEAR or (not allow_future and parsed > CUTOFF_DATE):
         return None, False, True, orig_str
 
     return parsed, False, False, orig_str
