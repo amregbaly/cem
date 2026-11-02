@@ -307,17 +307,25 @@ def descargar_certificado_pdf(
     if not cert:
         raise HTTPException(status_code=404, detail="Certificado no encontrado")
 
+    needs_save = False
     if cert.pdf_bytes:
         try:
-            pdf_bytes = base64.b64decode(cert.pdf_bytes)
+            raw_bytes = base64.b64decode(cert.pdf_bytes)
+            if b"localhost" in raw_bytes:
+                pdf_bytes = None
+                needs_save = True
+            else:
+                pdf_bytes = raw_bytes
         except Exception:
             pdf_bytes = None
+            needs_save = True
     else:
         pdf_bytes = None
+        needs_save = True
 
     if not pdf_bytes:
-        # Fallback regeneration if pdf_bytes was not populated
-        pdf_bytes, _, _ = generate_certificate_pdf(
+        # Fallback / upgrade regeneration using official production URL
+        pdf_bytes, sha256_hash, qr_base64 = generate_certificate_pdf(
             folio=cert.folio,
             token_verificacion=cert.token_verificacion,
             tipo_certificado=cert.tipo_certificado,
@@ -333,6 +341,14 @@ def descargar_certificado_pdf(
             funcionario_emisor=cert.funcionario_emisor,
             observaciones=cert.observaciones
         )
+        cert.pdf_bytes = base64.b64encode(pdf_bytes).decode("ascii")
+        cert.sha256_hash = sha256_hash
+        cert.codigo_qr_base64 = qr_base64
+        try:
+            db.commit()
+            db.refresh(cert)
+        except Exception:
+            db.rollback()
 
     headers = {
         "Content-Disposition": f'attachment; filename="{cert.folio}.pdf"',
@@ -421,6 +437,38 @@ def verificar_certificado_publico(folio_or_token: str, db: Session = Depends(get
             status_code=404,
             detail="Certificado no encontrado en el Registro Municipal. Verifique el folio o código QR."
         )
+
+    # Auto-upgrade any certificate that was previously compiled with a localhost URL
+    if cert.pdf_bytes:
+        try:
+            raw_bytes = base64.b64decode(cert.pdf_bytes)
+            if b"localhost" in raw_bytes:
+                pdf_bytes, sha256_hash, qr_base64 = generate_certificate_pdf(
+                    folio=cert.folio,
+                    token_verificacion=cert.token_verificacion,
+                    tipo_certificado=cert.tipo_certificado,
+                    cementerio_nombre=cert.cementerio.nombre if cert.cementerio else "San Carlos",
+                    codigo_ubicacion=cert.codigo_ubicacion or "N/A",
+                    fallecido_nombre=cert.fallecido_nombre,
+                    rut_fallecido=cert.rut_fallecido,
+                    titular_nombre=cert.titular_nombre,
+                    rut_titular=cert.rut_titular,
+                    fecha_emision=cert.fecha_emision,
+                    fecha_vencimiento=cert.fecha_vencimiento,
+                    autoridad_emisora=cert.autoridad_emisora,
+                    funcionario_emisor=cert.funcionario_emisor,
+                    observaciones=cert.observaciones
+                )
+                cert.pdf_bytes = base64.b64encode(pdf_bytes).decode("ascii")
+                cert.sha256_hash = sha256_hash
+                cert.codigo_qr_base64 = qr_base64
+                try:
+                    db.commit()
+                    db.refresh(cert)
+                except Exception:
+                    db.rollback()
+        except Exception:
+            pass
 
     return cert.to_public_dict()
 

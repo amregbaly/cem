@@ -126,6 +126,7 @@ POSTGRES_PASSWORD=cem_secure_password_2026
 POSTGRES_DB=cem_db
 POSTGRES_PORT=5432
 DATABASE_URL=postgresql+psycopg2://cem_admin:cem_secure_password_2026@localhost:5432/cem_db
+VERIFY_BASE_URL=https://munisancarlosdemo.voxera.net/verify/certificate
 
 NEXT_PUBLIC_API_URL=
 NEXT_PUBLIC_DEFAULT_LOCALE=es
@@ -244,6 +245,7 @@ AUDIT_HMAC_SECRET=cemetery-hmac-sha256-audit-secret-key-32bytes-min
 TOTP_ISSUER="Cementerio Municipal San Carlos"
 ACCESS_TOKEN_EXPIRE_MINUTES=480
 DATABASE_URL=sqlite:///./cem_dev.db
+VERIFY_BASE_URL=https://munisancarlosdemo.voxera.net/verify/certificate
 ENVEOF
         success "Archivo backend/.env configurado con SQLite."
     fi
