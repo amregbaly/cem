@@ -7,8 +7,9 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from app.infrastructure.db.session import get_db
 from app.domain.models import Inhumacion, Ubicacion, Persona, Usuario, RolUsuario, ConfigPortal
+from app.domain.models.grupo import ModuloSistema
 from app.domain.schemas.inhumacion import InhumacionResponse, InhumacionCreate
-from app.api.deps import require_role, get_current_user_optional, get_current_user
+from app.api.deps import require_role, get_current_user_optional, get_current_user, require_module_access
 from app.infrastructure.db.audit_listener import AuditService
 from etl.rut_validator import validate_and_format_rut
 from etl.name_parser import parse_chilean_name
@@ -83,10 +84,11 @@ def exportar_libro_inhumaciones(
     cementerio_id: Optional[int] = Query(None),
     formato: str = Query("csv", description="Formato: csv"),
     db: Session = Depends(get_db),
-    user: Optional[Usuario] = Depends(get_current_user_optional)
+    user: Usuario = Depends(require_module_access(ModuloSistema.INHUMACIONES.value, "READ"))
 ):
     """
     Exports official municipal burial ledger in CSV with UTF-8 BOM encoding.
+    Restricted strictly to authorized personnel with INHUMACIONES READ access.
     Complies with Ley 21.719 data protection principles.
     """
     is_staff = user and user.rol in {RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value}
@@ -177,7 +179,7 @@ def get_inhumacion(
 def create_inhumacion(
     inh_in: InhumacionCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.INHUMACIONES.value, "WRITE"))
 ):
     """
     Register a new burial (EETT 3.5 & Annex 2 Row 4 / A2-04).

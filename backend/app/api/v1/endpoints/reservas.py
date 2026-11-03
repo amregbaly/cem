@@ -3,10 +3,10 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.infrastructure.db.session import get_db
-from app.domain.models import Ubicacion, Usuario, RolUsuario, Inhumacion, Derecho, EstadoDerecho
+from app.domain.models import Ubicacion, Usuario, RolUsuario, Inhumacion, Derecho, EstadoDerecho, ModuloSistema
 from app.domain.models.reserva import Reserva, EstadoReserva
 from app.domain.schemas.reserva import ReservaCreate, ReservaLiberarRequest, ReservaResponse
-from app.api.deps import require_role
+from app.api.deps import require_role, require_module_access
 from app.infrastructure.db.audit_listener import AuditService
 from etl.rut_validator import validate_and_format_rut
 
@@ -19,7 +19,7 @@ def list_reservas(
     estado: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.UBICACIONES.value, "READ"))
 ):
     """
     List reservations with optional filters (EETT 3.11 & A2-13).
@@ -75,7 +75,7 @@ def list_reservas(
 def create_reserva(
     req: ReservaCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.UBICACIONES.value, "WRITE"))
 ):
     """
     Create a new location reservation (EETT 3.11 & Annex 2 Row 13 / A2-13).

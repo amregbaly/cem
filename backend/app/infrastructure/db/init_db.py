@@ -449,6 +449,7 @@ def init_db(db: Session) -> None:
                 ModuloSistema.AUDITORIA.value: NivelAcceso.WRITE.value,
                 ModuloSistema.CONFIGURACION.value: NivelAcceso.WRITE.value,
                 ModuloSistema.USUARIOS.value: NivelAcceso.WRITE.value,
+                ModuloSistema.REPORTES.value: NivelAcceso.WRITE.value,
             }
         },
         {
@@ -464,6 +465,7 @@ def init_db(db: Session) -> None:
                 ModuloSistema.AUDITORIA.value: NivelAcceso.READ.value,
                 ModuloSistema.CONFIGURACION.value: NivelAcceso.READ.value,
                 ModuloSistema.USUARIOS.value: NivelAcceso.NONE.value,
+                ModuloSistema.REPORTES.value: NivelAcceso.WRITE.value,
             }
         },
         {
@@ -479,6 +481,7 @@ def init_db(db: Session) -> None:
                 ModuloSistema.AUDITORIA.value: NivelAcceso.READ.value,
                 ModuloSistema.CONFIGURACION.value: NivelAcceso.NONE.value,
                 ModuloSistema.USUARIOS.value: NivelAcceso.NONE.value,
+                ModuloSistema.REPORTES.value: NivelAcceso.READ.value,
             }
         },
         {
@@ -494,6 +497,7 @@ def init_db(db: Session) -> None:
                 ModuloSistema.AUDITORIA.value: NivelAcceso.NONE.value,
                 ModuloSistema.CONFIGURACION.value: NivelAcceso.NONE.value,
                 ModuloSistema.USUARIOS.value: NivelAcceso.NONE.value,
+                ModuloSistema.REPORTES.value: NivelAcceso.NONE.value,
             }
         },
         {
@@ -509,6 +513,7 @@ def init_db(db: Session) -> None:
                 ModuloSistema.AUDITORIA.value: NivelAcceso.READ.value,
                 ModuloSistema.CONFIGURACION.value: NivelAcceso.NONE.value,
                 ModuloSistema.USUARIOS.value: NivelAcceso.NONE.value,
+                ModuloSistema.REPORTES.value: NivelAcceso.READ.value,
             }
         }
     ]

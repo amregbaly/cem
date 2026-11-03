@@ -1,11 +1,11 @@
 import re
 import unicodedata
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from app.infrastructure.db.session import get_db
-from app.domain.models import Inhumacion, Ubicacion, Persona, Usuario, RolUsuario, Exhumacion
+from app.domain.models import Inhumacion, Ubicacion, Persona, Usuario, RolUsuario, Exhumacion, ConfigPortal
 from app.api.deps import get_current_user_optional
 from etl.char_repair import repair_corrupted_characters
 
@@ -52,6 +52,14 @@ def instant_search(
         return {"query": raw_term, "total_results": 0, "results": []}
 
     is_staff = user and user.rol in {RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value}
+    if not is_staff:
+        portal_cfg = db.query(ConfigPortal).first()
+        if portal_cfg and not portal_cfg.permitir_busqueda_publica:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="La búsqueda pública está deshabilitada por configuración de seguridad municipal."
+            )
+
     norm_term = normalize_search_text(raw_term)
     rut_clean = re.sub(r"[^0-9kK]", "", raw_term).upper()
 
@@ -164,6 +172,7 @@ def instant_search(
                 continue
 
             titular = u.derechos[-1].titular.nombre_completo if u.derechos else None
+            titular_str = (titular if is_staff else "[CONFIDENCIAL LEY 21.719]") if titular else "Sin titular activo"
             # Bidirectional deceased listing
             fallecidos_en_ubicacion = [inh.fallecido.nombre_completo for inh in u.inhumaciones]
 
@@ -171,7 +180,7 @@ def instant_search(
                 "tipo": "UBICACION",
                 "id": u.id,
                 "titulo": f"Sepultura {u.codigo_completo}",
-                "subtitulo": f"Sector: {u.sector_codigo} | Estado: {u.estado} | {('Titular: ' + titular) if titular else 'Sin titular activo'}",
+                "subtitulo": f"Sector: {u.sector_codigo} | Estado: {u.estado} | {('Titular: ' + titular_str) if titular else 'Sin titular activo'}",
                 "ubicacion": u.codigo_completo,
                 "ubicacion_id": u.id,
                 "cementerio_id": u.cementerio_id,

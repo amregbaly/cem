@@ -343,9 +343,6 @@ export default function MaestrosPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
               Obras & Derechos de Maestros
             </h1>
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-              EETT 3.7
-            </span>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             Padrón de albañiles autorizados, cobro de derechos y permisos de colocación de lápidas y reparaciones

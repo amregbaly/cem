@@ -23,6 +23,7 @@ DEFAULT_MODULES = [
     ModuloSistema.AUDITORIA.value,
     ModuloSistema.CONFIGURACION.value,
     ModuloSistema.USUARIOS.value,
+    ModuloSistema.REPORTES.value,
 ]
 
 

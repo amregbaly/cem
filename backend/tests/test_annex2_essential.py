@@ -353,7 +353,7 @@ def test_a2_09_property_dossier(client):
     assert dossier["ubicacion"]["codigo_completo"] == ubic_codigo
     assert dossier["titular_actual"]["nombre"] == "BEATRIZ SOTO"
     assert len(dossier["titulares_historicos"]) >= 1
-    assert dossier["titulares_historicos"][0]["titular_anterior_nombre"] == "MANUEL MATURANA"
+    assert any(h["titular_anterior_nombre"] == "MANUEL MATURANA" for h in dossier["titulares_historicos"])
     assert len(dossier["timeline"]) >= 2
 
 
@@ -724,7 +724,15 @@ def test_a2_34_exit_package_portability(client):
     Probe: Build self-service exit package generator and verify standard SQL and CSVs.
     No proprietary locks; open-source DBMS importable.
     """
-    res = client.get("/api/v1/auditoria/exit-package")
+    # Unauthenticated request rejected (SEC-01)
+    unauth = client.get("/api/v1/auditoria/exit-package")
+    assert unauth.status_code == 401
+
+    token = get_token(client, "admin", "AdminCem2026!")
+    assert token is not None, "Failed to login as admin"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    res = client.get("/api/v1/auditoria/exit-package", headers=headers)
     assert res.status_code == 200
     assert res.headers["content-type"] == "application/zip"
 

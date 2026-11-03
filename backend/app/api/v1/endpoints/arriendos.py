@@ -23,7 +23,8 @@ from app.domain.models import (
 from app.domain.schemas.transferencia import TransferenciaCreate
 from app.infrastructure.services.notification_service import NotificationService
 from app.infrastructure.db.audit_listener import AuditService
-from app.api.deps import require_role, get_current_user_optional, get_current_user
+from app.domain.models.grupo import ModuloSistema
+from app.api.deps import require_role, get_current_user_optional, get_current_user, require_module_access
 
 router = APIRouter()
 
@@ -155,10 +156,11 @@ def get_vencimientos_radar(
 def notificar_titular_vencimiento(
     req: NotificarRequest,
     db: Session = Depends(get_db),
-    current_user: Optional[Usuario] = Depends(get_current_user_optional)
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.ARRIENDOS.value, "WRITE"))
 ):
     """
     Triggers multi-channel expiration alert (SMS, WhatsApp, Email).
+    Strictly restricted to users with ARRIENDOS WRITE permissions.
     Audit logged to append-only chain.
     """
     der = db.query(Derecho).filter(Derecho.id == req.derecho_id).first()
@@ -190,10 +192,10 @@ def notificar_titular_vencimiento(
             "canales": req.canales,
             "resultado": result
         },
-        user_id=current_user.id if current_user else 1,
-        username=current_user.username if current_user else "SISTEMA",
-        user_rut=current_user.rut if current_user else "11111111-1",
-        user_role=current_user.rol if current_user else "ADMINISTRADOR",
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
         commit=True
     )
 
@@ -205,7 +207,7 @@ def transferir_derecho_propiedad(
     derecho_id: int,
     req: TransferenciaCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.ARRIENDOS.value, "WRITE"))
 ):
     """
     Transfer property rights from current holder to a new person (EETT 3.8 & A2-16).
@@ -287,7 +289,7 @@ def renovar_arriendo(
     derecho_id: int,
     req: RenovacionRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.ARRIENDOS.value, "WRITE"))
 ):
     """
     Extends or renews a cemetery niche/patio lease (EETT 3.3, A2-03, A2-14).
@@ -364,7 +366,7 @@ def renovar_arriendo(
 def comprar_nicho_perpetuo(
     req: CompraPerpetuaRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.ARRIENDOS.value, "WRITE"))
 ):
     """
     Registers the perpetual purchase of a niche/grave (EETT 3.4 & A2-05).

@@ -5,11 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from app.infrastructure.db.session import get_db
-from app.domain.models import Ubicacion, Cementerio, Inhumacion, Derecho, Exhumacion, DerechosMaestros, Usuario, RolUsuario, EstadoUbicacion, Reserva
+from app.domain.models import Ubicacion, Cementerio, Inhumacion, Derecho, Exhumacion, DerechosMaestros, Usuario, RolUsuario, EstadoUbicacion, Reserva, ModuloSistema
 
 from app.domain.schemas.ubicacion import UbicacionResponse, UbicacionCreate
 from app.domain.schemas.spatial import SectorSummaryResponse, MapGridResponse, MapSlotResponse
-from app.api.deps import require_role, get_current_user_optional, get_current_user
+from app.api.deps import require_role, get_current_user_optional, get_current_user, require_module_access
 from app.infrastructure.db.audit_listener import AuditService
 
 router = APIRouter()
@@ -129,7 +129,7 @@ def get_map_grid(
 
     query = db.query(Ubicacion).filter(
         Ubicacion.cementerio_id == cementerio_id,
-        Ubicacion.sector_codigo == sector_codigo.upper()
+        func.upper(Ubicacion.sector_codigo) == sector_codigo.upper()
     )
 
     all_locs = query.order_by(Ubicacion.fila.asc(), Ubicacion.numero.asc()).all()
@@ -421,7 +421,7 @@ def get_ubicacion_historial(
                     "rut_nuevo": tr.titular_nuevo.rut if (tr.titular_nuevo and is_staff) else "[CONFIDENCIAL LEY 21.719]",
                     "numero_resolucion": tr.numero_resolucion,
                     "orden_ingreso": tr.orden_ingreso,
-                    "documento_respaldo_url": tr.documento_respaldo_url,
+                    "documento_respaldo_url": tr.documento_respaldo_url or "",
                     "motivo": tr.motivo,
                     "observaciones": tr.observaciones
                 }
@@ -528,7 +528,7 @@ def get_ubicacion_historial(
 def create_ubicacion(
     ubic_in: UbicacionCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.UBICACIONES.value, "WRITE"))
 ):
     """Create a new location."""
     ubic = Ubicacion(
@@ -573,7 +573,7 @@ def deshabilitar_ubicacion(
     ubicacion_id: int,
     req: DeshabilitarUbicacionRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.UBICACIONES.value, "WRITE"))
 ):
     """
     Logically disables a location (EETT 3.1 & A2-01).
@@ -622,7 +622,7 @@ def deshabilitar_ubicacion(
 def habilitar_ubicacion(
     ubicacion_id: int,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.UBICACIONES.value, "WRITE"))
 ):
     """
     Re-enables a previously disabled location (EETT 3.1).

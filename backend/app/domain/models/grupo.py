@@ -23,6 +23,8 @@ class ModuloSistema(str, enum.Enum):
     AUDITORIA = "AUDITORIA"             # Registro inmutable HMAC y trazabilidad
     CONFIGURACION = "CONFIGURACION"     # Personalización de temas y tokens
     USUARIOS = "USUARIOS"               # Administración de usuarios y grupos (RBAC)
+    REPORTES = "REPORTES"               # Módulo de reportes y estadísticas oficiales
+
 
 
 class Grupo(Base, TimestampMixin):

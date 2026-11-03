@@ -72,3 +72,55 @@ def require_role(*roles):
             )
         return current_user
     return role_checker
+
+
+def require_module_access(modulo: str, min_level: str = "READ"):
+    """
+    Checks granular RBAC access against tb_grupo_permiso.
+    Administrators (rol == RolUsuario.ADMINISTRADOR) always have full access.
+    Other users must belong to a group with at least min_level access for the given module.
+    """
+    def permission_checker(
+        current_user: Usuario = Depends(get_current_user),
+        db: Session = Depends(get_db)
+    ) -> Usuario:
+        # Administrators always have access
+        if current_user.rol == RolUsuario.ADMINISTRADOR.value or current_user.rol == "ADMINISTRADOR":
+            return current_user
+
+        if not current_user.grupo_id:
+            from app.domain.models.grupo import Grupo
+            if current_user.rol == RolUsuario.ADMINISTRATIVO.value or current_user.rol == "ADMINISTRATIVO":
+                grp = db.query(Grupo).filter_by(nombre="Operadores de Cementerio").first()
+                if grp:
+                    current_user.grupo_id = grp.id
+                    db.commit()
+            elif current_user.rol == RolUsuario.VISITA.value or current_user.rol == "VISITA":
+                grp = db.query(Grupo).filter_by(nombre="Atención Ciudadana y Auditoría").first()
+                if grp:
+                    current_user.grupo_id = grp.id
+                    db.commit()
+
+        if not current_user.grupo_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso denegado: El usuario no tiene un grupo asignado para acceder al módulo {modulo}."
+            )
+
+        from app.domain.models.grupo import GrupoPermiso, NivelAcceso
+        perm = db.query(GrupoPermiso).filter_by(grupo_id=current_user.grupo_id, modulo=modulo).first()
+        if not perm or perm.acceso == NivelAcceso.NONE.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso denegado: Su grupo no tiene permisos asignados para el módulo {modulo}."
+            )
+
+        if min_level == "WRITE" and perm.acceso != NivelAcceso.WRITE.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso denegado: Se requieren permisos de escritura para el módulo {modulo}."
+            )
+
+        return current_user
+    return permission_checker
+

@@ -12,10 +12,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.infrastructure.db.session import get_db
 from app.domain.models import Certificado, Ubicacion, Cementerio, Inhumacion, Derecho, Usuario, RolUsuario
+from app.domain.models.grupo import ModuloSistema
 from app.domain.schemas.certificado import CertificadoEmitirRequest, CertificadoAnularRequest, CertificadoPublicoResponse
 from app.infrastructure.services.pdf_generator import generate_certificate_pdf
 from app.infrastructure.db.audit_listener import AuditService
-from app.api.deps import require_role, get_current_user_optional, get_current_user
+from app.api.deps import require_role, get_current_user_optional, get_current_user, require_module_access
 
 router = APIRouter()
 
@@ -40,7 +41,7 @@ def get_next_folio(db: Session, tipo_cert: str, year: int) -> str:
 def emitir_certificado(
     req: CertificadoEmitirRequest,
     db: Session = Depends(get_db),
-    current_user: Optional[Usuario] = Depends(get_current_user_optional)
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.CERTIFICADOS.value, "WRITE"))
 ):
     """
     Issues an official municipal certificate, calculates SHA-256 fingerprint,
@@ -138,10 +139,10 @@ def emitir_certificado(
             "sha256": cert.sha256_hash,
             "token": cert.token_verificacion
         },
-        user_id=current_user.id if current_user else 1,
-        username=current_user.username if current_user else "SISTEMA",
-        user_rut=current_user.rut if current_user else "11111111-1",
-        user_role=current_user.rol if current_user else "ADMINISTRADOR",
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
         commit=True
     )
 
@@ -241,7 +242,7 @@ def descargar_certificado_pdf(
     ).first()
     
     if not cert:
-        # Check if matching Inhumacion exists in DB
+        # Check if matching verified Inhumacion exists in official database
         inh = db.query(Inhumacion).filter(
             (Inhumacion.pase_sepultacion_folio == clean_folio) |
             (Inhumacion.pase_sepultacion_folio == unprefixed) |
@@ -249,30 +250,28 @@ def descargar_certificado_pdf(
             (Inhumacion.numero_ingreso == unprefixed)
         ).first()
 
-        # Resolve cemetery
-        cem_obj = None
-        if inh and inh.ubicacion and inh.ubicacion.cementerio:
-            cem_obj = inh.ubicacion.cementerio
-        elif cementerio:
-            cem_obj = db.query(Cementerio).filter(Cementerio.nombre.ilike(f"%{cementerio}%")).first()
-        if not cem_obj:
-            cem_obj = db.query(Cementerio).first()
+        if not inh:
+            raise HTTPException(
+                status_code=404,
+                detail="Certificado no encontrado en el Registro Municipal."
+            )
 
-        cem_name = cem_obj.nombre if cem_obj else (cementerio or "San Carlos")
-        fallecido_name = fallecido or (inh.fallecido.nombre_completo if inh and inh.fallecido else None)
-        rut_fall = rut or (inh.fallecido.rut if inh and inh.fallecido else None)
-        cod_ubic = ubicacion or (inh.ubicacion.codigo_completo if inh and inh.ubicacion else "PAB-B-F03-N142")
+        # Resolve cemetery and verified details from database only
+        cem_obj = inh.ubicacion.cementerio if inh.ubicacion and inh.ubicacion.cementerio else db.query(Cementerio).first()
+        cem_name = cem_obj.nombre if cem_obj else "Cementerio Municipal de San Carlos"
+        fallecido_name = inh.fallecido.nombre_completo if inh.fallecido else "REGISTRO MUNICIPAL"
+        rut_fall = inh.fallecido.rut if inh.fallecido else None
+        cod_ubic = inh.ubicacion.codigo_completo if inh.ubicacion else "N/A"
         token_128bit = secrets.token_hex(16)
-        tipo_cert = (tipo or "INHUMACION").upper()
+        tipo_cert = "INHUMACION"
 
-        # If we have at least deceased name or it's a known FOL-/LIC- format, generate certificate
         pdf_bytes, sha256_hash, qr_base64 = generate_certificate_pdf(
             folio=clean_folio,
             token_verificacion=token_128bit,
             tipo_certificado=tipo_cert,
             cementerio_nombre=cem_name,
             codigo_ubicacion=cod_ubic,
-            fallecido_nombre=fallecido_name or "REGISTRO MUNICIPAL",
+            fallecido_nombre=fallecido_name,
             rut_fallecido=rut_fall,
             fecha_emision=date.today(),
             observaciones="Emisión digital oficial de registro de inhumación municipal."
@@ -286,7 +285,7 @@ def descargar_certificado_pdf(
             cementerio_id=cem_obj.id if cem_obj else 1,
             ubicacion_id=inh.ubicacion_id if inh else None,
             inhumacion_id=inh.id if inh else None,
-            fallecido_nombre=fallecido_name or "REGISTRO MUNICIPAL",
+            fallecido_nombre=fallecido_name,
             rut_fallecido=rut_fall,
             codigo_ubicacion=cod_ubic,
             fecha_emision=date.today(),
@@ -477,7 +476,7 @@ def verificar_certificado_publico(folio_or_token: str, db: Session = Depends(get
 def exportar_metadatos_certificados(
     formato: str = Query("json", description="Formato de exportación: json o csv"),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.CERTIFICADOS.value, "READ"))
 ):
     """
     Export certificate registry metadata in JSON or CSV format (EETT 3.10).

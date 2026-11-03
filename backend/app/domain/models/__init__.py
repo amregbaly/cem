@@ -9,7 +9,7 @@ from app.domain.models.exhumacion import Exhumacion
 from app.domain.models.maestros import Maestro, DerechosMaestros, TipoTrabajoMaestro
 from app.domain.models.usuario import Usuario, RolUsuario
 from app.domain.models.tema import ConfigTema
-from app.domain.models.audit import LogAuditoria
+from app.domain.models.audit import LogAuditoria, ActividadUsuario
 from app.domain.models.migration import ExcepcionMigracion, ReconciliacionMigracion
 from app.domain.models.certificado import Certificado, TipoCertificado, EstadoCertificado
 from app.domain.models.agenda_terreno import TareaTerreno, TipoTareaTerreno, EstadoTareaTerreno
@@ -44,6 +44,7 @@ __all__ = [
     "RolUsuario",
     "ConfigTema",
     "LogAuditoria",
+    "ActividadUsuario",
     "ExcepcionMigracion",
     "ReconciliacionMigracion",
     "Certificado",

@@ -23,14 +23,279 @@ from app.domain.models import (
     DerechosMaestros, 
     Certificado, 
     TareaTerreno, 
-    ConfigTema
+    ConfigTema,
+    ActividadUsuario
 )
-from app.domain.schemas.audit import AuditLogResponse, AuditVerificationResult
-from app.api.deps import require_role, get_current_user_optional
+from app.domain.schemas.audit import (
+    AuditLogResponse, 
+    AuditVerificationResult,
+    ActividadUsuarioResponse,
+    ActividadUsuarioListResponse,
+    ActividadUsuarioResumen,
+    ActividadUsuarioCreate
+)
+from app.api.deps import require_role, get_current_user_optional, get_current_user
 from app.infrastructure.db.audit_listener import AuditService
 from app.infrastructure.services.pdf_generator import generate_certificate_pdf
+from sqlalchemy import func, distinct, or_
 
 router = APIRouter()
+
+
+@router.get("/actividad", response_model=ActividadUsuarioListResponse)
+def list_user_activity(
+    q: Optional[str] = Query(None, description="Búsqueda libre por usuario, RUT, IP o descripción"),
+    username: Optional[str] = Query(None, description="Filtrar por nombre de usuario exacto"),
+    ip_address: Optional[str] = Query(None, description="Filtrar por dirección IP"),
+    modulo: Optional[str] = Query(None, description="Filtrar por módulo (INHUMACIONES, UBICACIONES, etc.)"),
+    metodo: Optional[str] = Query(None, description="Filtrar por método HTTP (GET, POST, PUT, DELETE)"),
+    status_tipo: Optional[str] = Query("todos", description="todos, exito, o error"),
+    fecha_desde: Optional[str] = Query(None, description="Fecha inicio YYYY-MM-DD"),
+    fecha_hasta: Optional[str] = Query(None, description="Fecha término YYYY-MM-DD"),
+    limit: int = Query(50, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, "ADMINISTRADOR"))
+):
+    """
+    Log de actividad y movimientos de usuarios dentro del sistema.
+    Acceso estrictamente restringido al Administrador.
+    Registra IP de origen, usuario, módulo, acción, estado y descripción.
+    """
+    query = db.query(ActividadUsuario)
+
+    # Normalizar parámetros
+    q_str = q.strip() if isinstance(q, str) and q.strip() else None
+    user_str = username.strip() if isinstance(username, str) and username.strip() else None
+    ip_str = ip_address.strip() if isinstance(ip_address, str) and ip_address.strip() else None
+    mod_str = modulo.strip() if isinstance(modulo, str) and modulo.strip() else None
+    met_str = metodo.strip() if isinstance(metodo, str) and metodo.strip() else None
+    stat_str = status_tipo.strip().lower() if isinstance(status_tipo, str) and status_tipo.strip() else "todos"
+    f_desde = fecha_desde.strip() if isinstance(fecha_desde, str) and fecha_desde.strip() else None
+    f_hasta = fecha_hasta.strip() if isinstance(fecha_hasta, str) and fecha_hasta.strip() else None
+
+    # Búsqueda general
+    if q_str:
+        term = f"%{q_str}%"
+        query = query.filter(
+            or_(
+                ActividadUsuario.username.ilike(term),
+                ActividadUsuario.user_rut.ilike(term),
+                ActividadUsuario.ip_address.ilike(term),
+                ActividadUsuario.descripcion.ilike(term),
+                ActividadUsuario.ruta.ilike(term),
+                ActividadUsuario.modulo.ilike(term),
+                ActividadUsuario.accion.ilike(term)
+            )
+        )
+
+    if user_str and user_str.lower() != "todos":
+        query = query.filter(ActividadUsuario.username == user_str)
+
+    if ip_str:
+        query = query.filter(ActividadUsuario.ip_address.ilike(f"%{ip_str}%"))
+
+    if mod_str and mod_str.lower() != "todos":
+        query = query.filter(ActividadUsuario.modulo == mod_str.upper())
+
+    if met_str and met_str.lower() != "todos":
+        query = query.filter(ActividadUsuario.metodo == met_str.upper())
+
+    if stat_str == "exito":
+        query = query.filter(ActividadUsuario.status_code < 400)
+    elif stat_str == "error":
+        query = query.filter(ActividadUsuario.status_code >= 400)
+
+    if f_desde:
+        try:
+            dt_desde = datetime.fromisoformat(f"{f_desde}T00:00:00")
+            query = query.filter(ActividadUsuario.timestamp >= dt_desde)
+        except Exception:
+            pass
+
+    if f_hasta:
+        try:
+            dt_hasta = datetime.fromisoformat(f"{f_hasta}T23:59:59")
+            query = query.filter(ActividadUsuario.timestamp <= dt_hasta)
+        except Exception:
+            pass
+
+    total = query.count()
+    items = query.order_by(ActividadUsuario.id.desc()).offset(offset).limit(limit).all()
+
+    # Calcular resumen global de métricas
+    tot_mov = db.query(func.count(ActividadUsuario.id)).scalar() or 0
+    usr_unc = db.query(func.count(distinct(ActividadUsuario.username))).scalar() or 0
+    ips_unc = db.query(func.count(distinct(ActividadUsuario.ip_address))).scalar() or 0
+    mod_cnt = db.query(func.count(ActividadUsuario.id)).filter(
+        ActividadUsuario.metodo.in_(["POST", "PUT", "DELETE", "PATCH"])
+    ).scalar() or 0
+    lec_cnt = db.query(func.count(ActividadUsuario.id)).filter(
+        ActividadUsuario.metodo == "GET"
+    ).scalar() or 0
+    err_cnt = db.query(func.count(ActividadUsuario.id)).filter(
+        ActividadUsuario.status_code >= 400
+    ).scalar() or 0
+
+    resumen = ActividadUsuarioResumen(
+        total_movimientos=tot_mov,
+        usuarios_unicos=usr_unc,
+        ips_unicas=ips_unc,
+        modificaciones_count=mod_cnt,
+        lecturas_count=lec_cnt,
+        errores_count=err_cnt
+    )
+
+    return ActividadUsuarioListResponse(
+        total=total,
+        items=items,
+        resumen=resumen
+    )
+
+
+@router.get("/actividad/exportar/csv")
+def export_user_activity_csv(
+    q: Optional[str] = Query(None),
+    modulo: Optional[str] = Query(None),
+    metodo: Optional[str] = Query(None),
+    status_tipo: Optional[str] = Query("todos"),
+    fecha_desde: Optional[str] = Query(None),
+    fecha_hasta: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, "ADMINISTRADOR"))
+):
+    """
+    Exporta el registro completo de actividad y movimientos de usuarios en CSV para Excel (UTF-8 con BOM).
+    Restringido exclusivamente a Administradores.
+    """
+    query = db.query(ActividadUsuario)
+
+    q_str = q.strip() if isinstance(q, str) and q.strip() else None
+    mod_str = modulo.strip() if isinstance(modulo, str) and modulo.strip() else None
+    met_str = metodo.strip() if isinstance(metodo, str) and metodo.strip() else None
+    stat_str = status_tipo.strip().lower() if isinstance(status_tipo, str) and status_tipo.strip() else "todos"
+    f_desde = fecha_desde.strip() if isinstance(fecha_desde, str) and fecha_desde.strip() else None
+    f_hasta = fecha_hasta.strip() if isinstance(fecha_hasta, str) and fecha_hasta.strip() else None
+
+    if q_str:
+        term = f"%{q_str}%"
+        query = query.filter(
+            or_(
+                ActividadUsuario.username.ilike(term),
+                ActividadUsuario.user_rut.ilike(term),
+                ActividadUsuario.ip_address.ilike(term),
+                ActividadUsuario.descripcion.ilike(term),
+                ActividadUsuario.ruta.ilike(term)
+            )
+        )
+
+    if mod_str and mod_str.lower() != "todos":
+        query = query.filter(ActividadUsuario.modulo == mod_str.upper())
+
+    if met_str and met_str.lower() != "todos":
+        query = query.filter(ActividadUsuario.metodo == met_str.upper())
+
+    if stat_str == "exito":
+        query = query.filter(ActividadUsuario.status_code < 400)
+    elif stat_str == "error":
+        query = query.filter(ActividadUsuario.status_code >= 400)
+
+    if f_desde:
+        try:
+            query = query.filter(ActividadUsuario.timestamp >= datetime.fromisoformat(f"{f_desde}T00:00:00"))
+        except Exception:
+            pass
+
+    if f_hasta:
+        try:
+            query = query.filter(ActividadUsuario.timestamp <= datetime.fromisoformat(f"{f_hasta}T23:59:59"))
+        except Exception:
+            pass
+
+    records = query.order_by(ActividadUsuario.id.desc()).limit(5000).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow([
+        "ID",
+        "Fecha_Hora_CLT",
+        "Usuario",
+        "RUT_Usuario",
+        "Rol_Usuario",
+        "IP_Origen",
+        "Metodo",
+        "Modulo",
+        "Accion",
+        "Ruta_Endpoint",
+        "Codigo_HTTP",
+        "Duracion_ms",
+        "Navegador_UserAgent",
+        "Descripcion_Movimiento"
+    ])
+
+    for r in records:
+        ts_str = r.timestamp.strftime("%Y-%m-%d %H:%M:%S") if r.timestamp else ""
+        writer.writerow([
+            r.id,
+            ts_str,
+            r.username,
+            r.user_rut or "",
+            r.user_role or "",
+            r.ip_address,
+            r.metodo,
+            r.modulo,
+            r.accion,
+            r.ruta,
+            r.status_code,
+            r.duracion_ms or 0,
+            r.user_agent or "",
+            r.descripcion
+        ])
+
+    csv_data = "\ufeff" + output.getvalue()
+    filename = f"actividad_usuarios_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+
+    return Response(
+        content=csv_data.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@router.post("/actividad", response_model=ActividadUsuarioResponse)
+def record_client_activity(
+    data: ActividadUsuarioCreate,
+    db: Session = Depends(get_db),
+    current_user: Optional[Usuario] = Depends(get_current_user_optional)
+):
+    """
+    Permite registrar un evento o navegación explícita desde la interfaz de usuario.
+    """
+    username = current_user.username if current_user else (data.username or "ANONIMO")
+    user_rut = current_user.rut if current_user else data.user_rut
+    user_role = current_user.rol if current_user else data.user_role
+    user_id = current_user.id if current_user else None
+
+    entry = ActividadUsuario(
+        username=username,
+        user_id=user_id,
+        user_rut=user_rut,
+        user_role=user_role,
+        ip_address=data.ip_address or "127.0.0.1",
+        user_agent=data.user_agent,
+        metodo=data.metodo,
+        ruta=data.ruta,
+        modulo=data.modulo,
+        accion=data.accion,
+        descripcion=data.descripcion,
+        status_code=data.status_code,
+        duracion_ms=data.duracion_ms,
+        detalles=data.detalles
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
 
 
 @router.get("", response_model=List[AuditLogResponse])
@@ -41,9 +306,9 @@ def list_audit_logs(
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    current_user: Optional[Usuario] = Depends(get_current_user_optional)
+    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, "ADMINISTRADOR"))
 ):
-    """List append-only audit logs. Restricted to Administrator role."""
+    """List append-only audit logs. Restricted strictly to Administrator role."""
     query = db.query(LogAuditoria)
     if modulo:
         query = query.filter(LogAuditoria.modulo == modulo.upper())
@@ -59,11 +324,12 @@ def list_audit_logs(
 @router.post("/verificar", response_model=AuditVerificationResult)
 def verify_audit_trail(
     db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, "ADMINISTRADOR"))
 ):
     """
     Cryptographic verification endpoint: Walks through the entire HMAC SHA-256 chain,
     re-computing each hash from the genesis block to verify zero records have been altered,
-    deleted, or inserted out of sequence.
+    deleted, or inserted out of sequence. Restricted to Administrator role.
     """
     is_valid, count, reason = AuditService.verify_chain_integrity(db)
     head_hash = AuditService.get_latest_hash(db)
@@ -78,9 +344,9 @@ def verify_audit_trail(
 @router.get("/export-csv")
 def export_audit_logs_csv(
     db: Session = Depends(get_db),
-    current_user: Optional[Usuario] = Depends(get_current_user_optional)
+    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, "ADMINISTRADOR"))
 ):
-    """Exports full immutable audit log to CSV for legal archiving."""
+    """Exports full immutable audit log to CSV for legal archiving. Restricted to Administrator."""
     logs = db.query(LogAuditoria).order_by(LogAuditoria.id.asc()).all()
     output = io.StringIO()
     writer = csv.writer(output)
@@ -118,7 +384,7 @@ def export_audit_logs_csv(
 @router.get("/exit-package")
 def export_native_exit_package(
     db: Session = Depends(get_db),
-    current_user: Optional[Usuario] = Depends(get_current_user_optional)
+    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, "ADMINISTRADOR"))
 ):
     """
     Native Data Exit Package (Cláusula de Salida):

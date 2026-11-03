@@ -29,7 +29,8 @@ import {
   Bot,
   BookmarkCheck,
   ArrowRightLeft,
-  Hammer
+  Hammer,
+  BarChart3
 } from "lucide-react";
 import ThemeCustomizerModal from "./ThemeCustomizerModal";
 
@@ -94,30 +95,31 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     {
       title: "OPERACIONES",
       items: [
-        { href: "/", label: t("navDashboard") || "Inicio / Panel General", icon: Building2, badge: "En vivo" },
+        { href: "/", label: t("navDashboard") || "Inicio / Panel General", icon: Building2 },
         { href: "/ubicaciones", label: t("navUbicaciones") || "Ubicaciones & GIS", icon: MapPin },
         { href: "/arriendos", label: t("navArriendos") || "Arriendos & Concesiones", icon: Clock },
         { href: "/inhumaciones", label: t("navInhumaciones") || "Inhumaciones & Libros", icon: Users },
-        { href: "/reservas", label: t("navReservas") || "Reservas de Sepulturas", icon: BookmarkCheck, badge: "EETT 3.11" },
-        { href: "/exhumaciones", label: t("navExhumaciones") || "Exhumaciones & Traslados", icon: ArrowRightLeft, badge: "EETT 3.6" },
+        { href: "/reservas", label: t("navReservas") || "Reservas de Sepulturas", icon: BookmarkCheck },
+        { href: "/exhumaciones", label: t("navExhumaciones") || "Exhumaciones & Traslados", icon: ArrowRightLeft },
         { href: "/maestros", label: t("navMaestros") || "Obras & Maestros", icon: Hammer },
-        { href: "/campo", label: t("navModoTerreno") || "Modo Terreno & Faenas", icon: HardHat, badge: "Offline" },
+        { href: "/campo", label: t("navModoTerreno") || "Modo Terreno & Faenas", icon: HardHat },
       ]
     },
 
     {
       title: "GOBERNANZA & SEGURIDAD",
       items: [
-        { href: "/auditoria", label: t("navAuditoria") || "Auditoría HMAC SHA-256", icon: ShieldCheck, badge: "Inmutable" },
+        { href: "/reportes", label: "Reportes & Estadísticas", icon: BarChart3 },
+        { href: "/auditoria", label: t("navAuditoria") || "Auditoría HMAC SHA-256", icon: ShieldCheck },
         { href: "/migracion", label: t("navMigracion") || "Migración ETL Histórica", icon: Database },
       ]
     },
     {
       title: "ADMINISTRACIÓN MUNICIPAL",
       items: [
-        { href: "/admin", label: "Control de Acceso & Grupos", icon: UserCog, badge: "RBAC" },
+        { href: "/admin", label: "Control de Acceso & Grupos", icon: UserCog },
         { href: "/admin/temas", label: "Identidad Visual & Temas", icon: Palette },
-        { href: "/admin/asistente", label: "Asistente de IA", icon: Bot, badge: "IA" },
+        { href: "/admin/asistente", label: "Asistente de IA", icon: Bot },
       ]
     }
   ];
@@ -126,16 +128,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     {
       title: "PORTAL CIUDADANO (PÚBLICO)",
       items: [
-        { href: "/verify/certificate", label: "Certificados Oficiales", icon: FileCheck2, badge: "Público" },
+        { href: "/verify/certificate", label: "Certificados Oficiales", icon: FileCheck2 },
         ...(permitirListaFallecidos
-          ? [{ href: "/inhumaciones", label: "Lista de Sepultaciones", icon: Users, badge: "Público" }]
+          ? [{ href: "/inhumaciones", label: "Lista de Sepultaciones", icon: Users }]
           : []),
       ]
     },
     {
       title: "ÁREA MUNICIPAL",
       items: [
-        { href: "/admin", label: "Acceso Funcionarios / Login", icon: UserCog, badge: "Seguro" },
+        { href: "/admin", label: "Acceso Funcionarios / Login", icon: UserCog },
       ]
     }
   ];
@@ -284,17 +286,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         }`} />
                         <span className="truncate">{item.label}</span>
                       </div>
-                      {item.badge && (
-                        <span 
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                            isActive 
-                              ? "bg-white/20 text-white" 
-                              : "bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
                     </Link>
                   );
                 })}
@@ -408,9 +399,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               </button>
             </div>
 
-            {/* Version & EETT Badge */}
+            {/* Version */}
             <span className="text-[10px] font-mono opacity-50">
-              EETT 2026
+              v2.0
             </span>
           </div>
         </div>

@@ -28,7 +28,7 @@ def test_listar_grupos_admin(admin_token):
     first_group = data[0]
     assert "nombre" in first_group
     assert "permisos" in first_group
-    assert len(first_group["permisos"]) == 8
+    assert len(first_group["permisos"]) == 9
     # Check permissions format
     for p in first_group["permisos"]:
         assert p["acceso"] in ["NONE", "READ", "WRITE"]

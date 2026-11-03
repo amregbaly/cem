@@ -84,7 +84,7 @@ def list_maestros(
 def create_maestro(
     req: MaestroCreate,
     db: Session = Depends(get_db),
-    current_user: Optional[Usuario] = Depends(get_current_user_optional)
+    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
 ):
     """
     Register a new authorized mason.
@@ -118,10 +118,10 @@ def create_maestro(
         entidad="core.tb_maestros",
         registro_id=str(maestro.id),
         payload_posterior={"rut": maestro.rut, "nombre": maestro.nombre_completo},
-        user_id=current_user.id if current_user else 1,
-        username=current_user.username if current_user else "SISTEMA",
-        user_rut=current_user.rut if current_user else "11111111-1",
-        user_role=current_user.rol if current_user else "ADMINISTRADOR",
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
         commit=True
     )
 
@@ -163,7 +163,7 @@ def list_ordenes_maestros(
 def create_orden_maestro(
     req: TrabajoMaestroCreate,
     db: Session = Depends(get_db),
-    current_user: Optional[Usuario] = Depends(get_current_user_optional)
+    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
 ):
     """
     Registers a mason work order (tombstone placement, repair, maintenance).
@@ -219,10 +219,10 @@ def create_orden_maestro(
             "ubicacion": ubic.codigo_completo,
             "tipo_trabajo": trabajo.tipo_trabajo
         },
-        user_id=current_user.id if current_user else 1,
-        username=current_user.username if current_user else "SISTEMA",
-        user_rut=current_user.rut if current_user else "11111111-1",
-        user_role=current_user.rol if current_user else "ADMINISTRADOR",
+        user_id=current_user.id,
+        username=current_user.username,
+        user_rut=current_user.rut,
+        user_role=current_user.rol,
         commit=True
     )
 

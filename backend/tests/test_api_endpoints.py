@@ -48,20 +48,43 @@ def test_autocomplete_search():
     assert isinstance(data["results"], list)
 
 def test_auditoria_verificar():
-    # Test GET verification endpoint
-    res = client.get("/api/v1/auditoria/verificar")
+    # 1. Unauthenticated requests must be rejected (SEC-01)
+    unauth_get = client.get("/api/v1/auditoria/verificar")
+    assert unauth_get.status_code == 401
+    unauth_post = client.post("/api/v1/auditoria/verificar")
+    assert unauth_post.status_code == 401
+
+    # 2. Authenticated Admin request succeeds
+    login_res = client.post("/api/v1/auth/login", json={"username": "admin", "password": "AdminCem2026!"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Test GET verification endpoint with admin token
+    res = client.get("/api/v1/auditoria/verificar", headers=headers)
     assert res.status_code == 200
     data = res.json()
     assert "is_valid" in data
     assert "records_checked" in data
 
-    # Test POST verification endpoint
-    res_post = client.post("/api/v1/auditoria/verificar")
+    # Test POST verification endpoint with admin token
+    res_post = client.post("/api/v1/auditoria/verificar", headers=headers)
     assert res_post.status_code == 200
     assert res_post.json()["is_valid"] is True
 
+
 def test_migracion_reconciliacion():
-    res = client.get("/api/v1/migracion/reconciliacion")
+    # 1. Unauthenticated requests must be rejected (SEC-05)
+    unauth_res = client.get("/api/v1/migracion/reconciliacion")
+    assert unauth_res.status_code == 401
+
+    # 2. Authenticated Admin request succeeds
+    login_res = client.post("/api/v1/auth/login", json={"username": "admin", "password": "AdminCem2026!"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    res = client.get("/api/v1/migracion/reconciliacion", headers=headers)
     assert res.status_code == 200
     data = res.json()
     assert "resumen" in data

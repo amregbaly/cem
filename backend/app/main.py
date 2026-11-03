@@ -55,10 +55,16 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     return response
 
-# CORS middleware for Next.js frontend
+from app.core.activity_middleware import ActivityLoggingMiddleware
+
+# Activity logging middleware for user movements and IP tracking
+app.add_middleware(ActivityLoggingMiddleware)
+
+# CORS middleware for Next.js frontend (SEC-07: bounded origins with credentials)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|munisancarlosdemo\.voxera\.net)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -211,9 +211,6 @@ export default function UbicacionesPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
               {t("navUbicaciones")}
             </h1>
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20">
-              GIS Espacial 2D
-            </span>
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Plano interactivo georreferenciado de pabellones, patios y nichos para San Carlos y Cachapoal

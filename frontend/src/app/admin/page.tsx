@@ -35,7 +35,14 @@ import {
   HelpCircle,
   FolderPlus,
   Globe,
-  ExternalLink
+  ExternalLink,
+  BarChart3,
+  FileText,
+  Printer,
+  Activity,
+  Copy,
+  Radio,
+  Filter
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -77,6 +84,7 @@ const ALL_MODULES = [
   "CERTIFICADOS",
   "CAMPO",
   "AUDITORIA",
+  "REPORTES",
   "CONFIGURACION",
   "USUARIOS"
 ];
@@ -112,6 +120,11 @@ const MODULE_INFO: Record<string, { label: string; desc: string; icon: any }> = 
     desc: "Trazabilidad inmutable según Ley 21.719 y ASVS Nivel 2.",
     icon: ShieldCheck
   },
+  REPORTES: {
+    label: "Reportes & Estadísticas",
+    desc: "Libro de defunciones, vencimientos, capacidad territorial y finanzas.",
+    icon: BarChart3
+  },
   CONFIGURACION: {
     label: "Configuración & Temas",
     desc: "Identidad visual institucional y parámetros comunales.",
@@ -129,7 +142,7 @@ export default function AdminPage() {
   const { isDarkMode } = useTheme();
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<"usuarios" | "grupos" | "portal">("usuarios");
+  const [activeTab, setActiveTab] = useState<"usuarios" | "grupos" | "portal" | "reportes" | "actividad">("usuarios");
 
   // Portal Public Access Configuration State
   const [portalConfig, setPortalConfig] = useState({
@@ -220,7 +233,174 @@ export default function AdminPage() {
   // Action status message
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
+  // Reports State in Admin Tab
+  const [reportCemetery, setReportCemetery] = useState<string>("");
+  const [reportFechaDesde, setReportFechaDesde] = useState<string>("");
+  const [reportFechaHasta, setReportFechaHasta] = useState<string>("");
+  const [resumenKPIs, setResumenKPIs] = useState<any>(null);
+  const [loadingKPIs, setLoadingKPIs] = useState(false);
+  const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
+
   const apiUrl = "";  // always relative — proxied by Next.js rewrites + Nginx
+
+  const fetchResumenKPIs = async (authToken?: string, cemeteryId?: string) => {
+    const t = authToken || token;
+    if (!t) return;
+    setLoadingKPIs(true);
+    try {
+      const url = cemeteryId 
+        ? `${apiUrl}/api/v1/reportes/resumen?cementerio_id=${cemeteryId}` 
+        : `${apiUrl}/api/v1/reportes/resumen`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${t}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setResumenKPIs(data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingKPIs(false);
+    }
+  };
+
+  const handleDownloadReportCsv = async (tipo: string, customCategory?: string) => {
+    if (!token) return;
+    setDownloadingReport(tipo);
+    try {
+      const params = new URLSearchParams();
+      params.set("tipo", tipo);
+      if (reportCemetery) params.set("cementerio_id", reportCemetery);
+      if (reportFechaDesde) params.set("fecha_desde", reportFechaDesde);
+      if (reportFechaHasta) params.set("fecha_hasta", reportFechaHasta);
+      if (customCategory) params.set("categoria_venc", customCategory);
+
+      const res = await fetch(`${apiUrl}/api/v1/reportes/exportar/csv?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        throw new Error("No se pudo descargar el reporte. Verifique permisos de su grupo.");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte_${tipo}_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.message || "Error al descargar reporte");
+    } finally {
+      setDownloadingReport(null);
+    }
+  };
+
+  // User Activity Log State in Admin Tab
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [activityTotal, setActivityTotal] = useState(0);
+  const [activityResumen, setActivityResumen] = useState({
+    total_movimientos: 0,
+    usuarios_unicos: 0,
+    ips_unicas: 0,
+    modificaciones_count: 0,
+    lecturas_count: 0,
+    errores_count: 0,
+  });
+  const [loadingActivity, setLoadingActivity] = useState(false);
+  const [activitySearch, setActivitySearch] = useState("");
+  const [activityModule, setActivityModule] = useState("todos");
+  const [activityMethod, setActivityMethod] = useState("todos");
+  const [activityStatus, setActivityStatus] = useState("todos");
+  const [activityUser, setActivityUser] = useState("todos");
+  const [activityDateRange, setActivityDateRange] = useState("todos");
+  const [activityPage, setActivityPage] = useState(0);
+  const [activityLimit, setActivityLimit] = useState(25);
+  const [activityAutoRefresh, setActivityAutoRefresh] = useState(false);
+  const [selectedActivityDetail, setSelectedActivityDetail] = useState<any | null>(null);
+  const [copiedIp, setCopiedIp] = useState<string | null>(null);
+  const [exportingActivityCsv, setExportingActivityCsv] = useState(false);
+
+  const fetchActivityLogs = async (authToken?: string) => {
+    const t = authToken || token;
+    if (!t) return;
+    setLoadingActivity(true);
+    try {
+      const params = new URLSearchParams();
+      params.append("limit", String(activityLimit));
+      params.append("offset", String(activityPage * activityLimit));
+      if (activitySearch.trim()) params.append("q", activitySearch.trim());
+      if (activityModule !== "todos") params.append("modulo", activityModule);
+      if (activityMethod !== "todos") params.append("metodo", activityMethod);
+      if (activityStatus !== "todos") params.append("status_tipo", activityStatus);
+      if (activityUser !== "todos") params.append("username", activityUser);
+
+      if (activityDateRange === "hoy") {
+        const todayStr = new Date().toISOString().split("T")[0];
+        params.append("fecha_desde", todayStr);
+      } else if (activityDateRange === "7dias") {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        params.append("fecha_desde", d.toISOString().split("T")[0]);
+      } else if (activityDateRange === "30dias") {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        params.append("fecha_desde", d.toISOString().split("T")[0]);
+      }
+
+      const res = await fetch(`${apiUrl}/api/v1/auditoria/actividad?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${t}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActivityLogs(data.items || []);
+        setActivityTotal(data.total || 0);
+        if (data.resumen) {
+          setActivityResumen(data.resumen);
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingActivity(false);
+    }
+  };
+
+  const handleExportActivityCsv = async () => {
+    const t = token;
+    if (!t) return;
+    setExportingActivityCsv(true);
+    try {
+      const params = new URLSearchParams();
+      if (activitySearch.trim()) params.append("q", activitySearch.trim());
+      if (activityModule !== "todos") params.append("modulo", activityModule);
+      if (activityMethod !== "todos") params.append("metodo", activityMethod);
+      if (activityStatus !== "todos") params.append("status_tipo", activityStatus);
+      
+      const res = await fetch(`${apiUrl}/api/v1/auditoria/actividad/exportar/csv?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${t}` }
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `registro_actividad_usuarios_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setExportingActivityCsv(false);
+    }
+  };
 
   // Check stored token on mount
   useEffect(() => {
@@ -250,8 +430,23 @@ export default function AdminPage() {
       }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "reportes" && token) {
+      fetchResumenKPIs(token, reportCemetery);
+    } else if (activeTab === "actividad" && token) {
+      fetchActivityLogs(token);
+    }
+  }, [activeTab, reportCemetery, activitySearch, activityModule, activityMethod, activityStatus, activityUser, activityDateRange, activityPage, activityLimit, token]);
+
+  useEffect(() => {
+    if (!activityAutoRefresh || activeTab !== "actividad" || !token) return;
+    const interval = setInterval(() => {
+      fetchActivityLogs(token);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [activityAutoRefresh, activeTab, token, activitySearch, activityModule, activityMethod, activityStatus, activityUser, activityDateRange, activityPage, activityLimit]);
 
   const handleLogin = async (overrideUser?: string, overridePass?: string) => {
     const u = (overrideUser || loginUsername).trim();
@@ -1173,6 +1368,36 @@ export default function AdminPage() {
                 </span>
               )}
             </button>
+            <button
+              id="tab-btn-reportes"
+              onClick={() => setActiveTab("reportes")}
+              className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-sm transition-all ${
+                activeTab === "reportes"
+                  ? "border-primary text-primary"
+                  : "border-transparent opacity-60 hover:opacity-100"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Reportes & Estadísticas</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold">
+                DS 357
+              </span>
+            </button>
+            <button
+              id="tab-btn-actividad"
+              onClick={() => setActiveTab("actividad")}
+              className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-bold text-sm transition-all ${
+                activeTab === "actividad"
+                  ? "border-primary text-primary"
+                  : "border-transparent opacity-60 hover:opacity-100"
+              }`}
+            >
+              <Activity className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <span>Actividad de Usuarios (Log)</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold">
+                Admin
+              </span>
+            </button>
           </div>
 
           {/* TAB 1: FUNCIONARIOS */}
@@ -1789,6 +2014,1052 @@ export default function AdminPage() {
                         BLOQUEADO PARA VISITANTES
                       </span>
                     )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: REPORTES & ESTADÍSTICAS MUNICIPALES */}
+          {activeTab === "reportes" && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div
+                className="p-6 sm:p-8 rounded-2xl border shadow-sm transition-all"
+                style={{
+                  backgroundColor: "var(--color-surface)",
+                  borderColor: "var(--color-border)",
+                }}
+              >
+                <div
+                  className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 pb-6 border-b"
+                  style={{ borderColor: "var(--color-border)" }}
+                >
+                  <div className="space-y-2 max-w-2xl">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                        <BarChart3 className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
+                          Reportes & Estadísticas Municipales
+                        </h2>
+                        <p className="text-xs opacity-70">
+                          Consola administrativa de libros oficiales, vencimiento de arriendos, capacidad territorial y control de faenas según Decreto Supremo 357 y normativa de Contraloría (CGR).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3 self-start">
+                    <Link
+                      href="/reportes"
+                      id="btn-open-full-reports"
+                      className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+                      style={{ backgroundColor: "var(--color-primary)" }}
+                    >
+                      <span>Abrir Centro de Reportes Completo</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Filters */}
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center space-x-2">
+                      <label className="text-xs font-bold opacity-75">Cementerio:</label>
+                      <select
+                        id="admin-report-cemetery-select"
+                        value={reportCemetery}
+                        onChange={(e) => setReportCemetery(e.target.value)}
+                        className="text-xs font-semibold px-3 py-2 rounded-xl border bg-transparent"
+                        style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                      >
+                        <option value="">Ambos Cementerios</option>
+                        <option value="1">Cementerio Municipal de San Carlos</option>
+                        <option value="2">Cementerio Municipal de Cachapoal</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <label className="text-xs font-bold opacity-75">Desde:</label>
+                      <input
+                        type="date"
+                        id="admin-report-date-from"
+                        value={reportFechaDesde}
+                        onChange={(e) => setReportFechaDesde(e.target.value)}
+                        className="text-xs px-3 py-1.5 rounded-xl border bg-transparent"
+                        style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <label className="text-xs font-bold opacity-75">Hasta:</label>
+                      <input
+                        type="date"
+                        id="admin-report-date-to"
+                        value={reportFechaHasta}
+                        onChange={(e) => setReportFechaHasta(e.target.value)}
+                        className="text-xs px-3 py-1.5 rounded-xl border bg-transparent"
+                        style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => fetchResumenKPIs(token, reportCemetery)}
+                    disabled={loadingKPIs}
+                    className="flex items-center space-x-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingKPIs ? "animate-spin" : ""}`} />
+                    <span>Actualizar Métricas</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* KPI Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Inhumaciones */}
+                <div
+                  className="p-5 rounded-2xl border shadow-sm transition-all relative overflow-hidden"
+                  style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider opacity-60">Inhumaciones</span>
+                    <Users className="w-4 h-4 text-blue-500" />
+                  </div>
+                  <div className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
+                    {resumenKPIs ? resumenKPIs.inhumaciones.total.toLocaleString() : "..."}
+                  </div>
+                  <p className="text-xs opacity-70 mt-1">Registros en Libro Oficial</p>
+                  <div className="flex items-center space-x-2 mt-3 pt-3 border-t text-[11px]" style={{ borderColor: "var(--color-border)" }}>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      +{resumenKPIs?.inhumaciones.este_mes || 0} este mes
+                    </span>
+                    <span className="opacity-40">•</span>
+                    <span className="opacity-70">
+                      +{resumenKPIs?.inhumaciones.este_ano || 0} año
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Capacidad Territorial */}
+                <div
+                  className="p-5 rounded-2xl border shadow-sm transition-all relative overflow-hidden"
+                  style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider opacity-60">Ocupación Territorial</span>
+                    <MapPin className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
+                    {resumenKPIs ? `${resumenKPIs.capacidad.tasa_ocupacion_pct}%` : "..."}
+                  </div>
+                  <p className="text-xs opacity-70 mt-1">
+                    {resumenKPIs ? `${resumenKPIs.capacidad.ocupados} ocupados de ${resumenKPIs.capacidad.total_espacios}` : "Cargando..."}
+                  </p>
+                  <div className="flex items-center space-x-2 mt-3 pt-3 border-t text-[11px]" style={{ borderColor: "var(--color-border)" }}>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">
+                      {resumenKPIs?.capacidad.disponibles || 0} disponibles
+                    </span>
+                    <span className="opacity-40">•</span>
+                    <span className="opacity-70">
+                      {resumenKPIs?.capacidad.reservados || 0} reservas
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Vencimientos */}
+                <div
+                  className="p-5 rounded-2xl border shadow-sm transition-all relative overflow-hidden"
+                  style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider opacity-60">Arriendos Vencidos</span>
+                    <Clock className="w-4 h-4 text-rose-500" />
+                  </div>
+                  <div className="text-3xl font-extrabold tracking-tight text-rose-600 dark:text-rose-400">
+                    {resumenKPIs ? resumenKPIs.vencimientos.vencidos.toLocaleString() : "..."}
+                  </div>
+                  <p className="text-xs opacity-70 mt-1">Requieren gestión o aviso</p>
+                  <div className="flex items-center space-x-2 mt-3 pt-3 border-t text-[11px]" style={{ borderColor: "var(--color-border)" }}>
+                    <span className="font-semibold text-amber-600 dark:text-amber-400">
+                      {resumenKPIs?.vencimientos.por_vencer_30d || 0} por vencer (30d)
+                    </span>
+                    <span className="opacity-40">•</span>
+                    <span className="opacity-70">
+                      {resumenKPIs?.vencimientos.total_vigentes || 0} vigentes
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. Operaciones & Maestros */}
+                <div
+                  className="p-5 rounded-2xl border shadow-sm transition-all relative overflow-hidden"
+                  style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider opacity-60">Faenas & Maestros</span>
+                    <HardHat className="w-4 h-4 text-indigo-500" />
+                  </div>
+                  <div className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
+                    {resumenKPIs ? resumenKPIs.maestros.activos : "..."}
+                  </div>
+                  <p className="text-xs opacity-70 mt-1">Maestros habilitados</p>
+                  <div className="flex items-center space-x-2 mt-3 pt-3 border-t text-[11px]" style={{ borderColor: "var(--color-border)" }}>
+                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                      {resumenKPIs?.exhumaciones_total || 0} exhumaciones
+                    </span>
+                    <span className="opacity-40">•</span>
+                    <span className="opacity-70">
+                      {resumenKPIs?.certificados_emitidos || 0} certificados
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Official Reports Catalog Grid */}
+              <div
+                className="p-6 rounded-2xl border shadow-sm"
+                style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+              >
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="font-bold text-base" style={{ color: "var(--color-text)" }}>
+                      Catálogo de Libros Oficiales y Exportación de Datos
+                    </h3>
+                    <p className="text-xs opacity-70">
+                      Generación de planillas compatibles con Microsoft Excel (codificación UTF-8 con BOM y delimitador estándar).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Report 1 */}
+                  <div
+                    className="p-5 rounded-xl border flex flex-col justify-between transition-all hover:shadow-md"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-background)" }}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                          <Users className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-700 dark:text-blue-300">
+                          DS 357 Art. 48
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm" style={{ color: "var(--color-text)" }}>
+                        Libro Oficial de Defunciones e Inhumaciones
+                      </h4>
+                      <p className="text-xs opacity-70 leading-relaxed">
+                        Nómina legal de sepultaciones con RUT, folio de pase de defunción, coordenadas de sepultura y familiar responsable.
+                      </p>
+                    </div>
+
+                    <div className="pt-4 mt-4 border-t flex items-center justify-between" style={{ borderColor: "var(--color-border)" }}>
+                      <span className="text-[11px] opacity-60">Exportación oficial</span>
+                      <button
+                        type="button"
+                        id="btn-export-defunciones-admin"
+                        onClick={() => handleDownloadReportCsv("defunciones")}
+                        disabled={downloadingReport === "defunciones"}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                        style={{ backgroundColor: "var(--color-primary)" }}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{downloadingReport === "defunciones" ? "Generando..." : "Descargar CSV"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Report 2 */}
+                  <div
+                    className="p-5 rounded-xl border flex flex-col justify-between transition-all hover:shadow-md"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-background)" }}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="p-2 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                          <Clock className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300">
+                          Finanzas & Cobranza
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm" style={{ color: "var(--color-text)" }}>
+                        Control de Vencimiento de Arriendos
+                      </h4>
+                      <p className="text-xs opacity-70 leading-relaxed">
+                        Contratos temporales vencidos y en plazo crítico (30, 60 y 90 días) para cobranza municipal y notificaciones.
+                      </p>
+                    </div>
+
+                    <div className="pt-4 mt-4 border-t flex items-center justify-between" style={{ borderColor: "var(--color-border)" }}>
+                      <span className="text-[11px] opacity-60">Auditoría de aranceles</span>
+                      <button
+                        type="button"
+                        id="btn-export-vencimientos-admin"
+                        onClick={() => handleDownloadReportCsv("vencimientos")}
+                        disabled={downloadingReport === "vencimientos"}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                        style={{ backgroundColor: "var(--color-primary)" }}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{downloadingReport === "vencimientos" ? "Generando..." : "Descargar CSV"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Report 3 */}
+                  <div
+                    className="p-5 rounded-xl border flex flex-col justify-between transition-all hover:shadow-md"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-background)" }}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          <MapPin className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                          Catastro Territorial
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm" style={{ color: "var(--color-text)" }}>
+                        Censo de Capacidad & Ocupación GIS
+                      </h4>
+                      <p className="text-xs opacity-70 leading-relaxed">
+                        Desglose territorial por cuartel, patio y pabellón con conteo de sepulturas disponibles, ocupadas y bloqueadas.
+                      </p>
+                    </div>
+
+                    <div className="pt-4 mt-4 border-t flex items-center justify-between" style={{ borderColor: "var(--color-border)" }}>
+                      <span className="text-[11px] opacity-60">Balance físico</span>
+                      <button
+                        type="button"
+                        id="btn-export-capacidad-admin"
+                        onClick={() => handleDownloadReportCsv("capacidad")}
+                        disabled={downloadingReport === "capacidad"}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                        style={{ backgroundColor: "var(--color-primary)" }}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{downloadingReport === "capacidad" ? "Generando..." : "Descargar CSV"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Report 4 */}
+                  <div
+                    className="p-5 rounded-xl border flex flex-col justify-between transition-all hover:shadow-md"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-background)" }}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                          DS 357 / SEREMI
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm" style={{ color: "var(--color-text)" }}>
+                        Libro de Exhumaciones & Reducciones
+                      </h4>
+                      <p className="text-xs opacity-70 leading-relaxed">
+                        Registro cronológico de aperturas de sepultura, número de resolución sanitaria y destino de restos.
+                      </p>
+                    </div>
+
+                    <div className="pt-4 mt-4 border-t flex items-center justify-between" style={{ borderColor: "var(--color-border)" }}>
+                      <span className="text-[11px] opacity-60">Control sanitario</span>
+                      <button
+                        type="button"
+                        id="btn-export-exhumaciones-admin"
+                        onClick={() => handleDownloadReportCsv("exhumaciones")}
+                        disabled={downloadingReport === "exhumaciones"}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                        style={{ backgroundColor: "var(--color-primary)" }}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{downloadingReport === "exhumaciones" ? "Generando..." : "Descargar CSV"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Report 5 */}
+                  <div
+                    className="p-5 rounded-xl border flex flex-col justify-between transition-all hover:shadow-md"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-background)" }}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                          <HardHat className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+                          Obras Particulares
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm" style={{ color: "var(--color-text)" }}>
+                        Registro de Maestros & Derechos de Obra
+                      </h4>
+                      <p className="text-xs opacity-70 leading-relaxed">
+                        Control de contratistas autorizados, órdenes de trabajo, sepulturas intervenidas y aranceles cancelados.
+                      </p>
+                    </div>
+
+                    <div className="pt-4 mt-4 border-t flex items-center justify-between" style={{ borderColor: "var(--color-border)" }}>
+                      <span className="text-[11px] opacity-60">Control de faenas</span>
+                      <button
+                        type="button"
+                        id="btn-export-maestros-admin"
+                        onClick={() => handleDownloadReportCsv("maestros")}
+                        disabled={downloadingReport === "maestros"}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                        style={{ backgroundColor: "var(--color-primary)" }}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{downloadingReport === "maestros" ? "Generando..." : "Descargar CSV"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card 6: Direct Link */}
+                  <div
+                    className="p-5 rounded-xl border border-dashed flex flex-col justify-between transition-all hover:border-primary"
+                    style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+                  >
+                    <div className="space-y-2">
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary w-fit">
+                        <ExternalLink className="w-5 h-5" />
+                      </div>
+                      <h4 className="font-bold text-sm" style={{ color: "var(--color-text)" }}>
+                        Módulo Completo de Reportes
+                      </h4>
+                      <p className="text-xs opacity-70 leading-relaxed">
+                        Acceda a la visualización de datos en vivo, paginación, búsqueda instantánea por RUT o nombre, y formato imprimible oficial.
+                      </p>
+                    </div>
+
+                    <div className="pt-4 mt-4 border-t flex items-center justify-between" style={{ borderColor: "var(--color-border)" }}>
+                      <Link
+                        href="/reportes"
+                        className="flex items-center space-x-1 text-xs font-bold text-primary hover:underline"
+                      >
+                        <span>Ir a la página de Reportes</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* RBAC Notice Card */}
+              <div
+                className="p-6 rounded-2xl border bg-blue-50/50 dark:bg-blue-950/20"
+                style={{ borderColor: "var(--color-border)" }}
+              >
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-start space-x-3.5">
+                    <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm" style={{ color: "var(--color-text)" }}>
+                        Seguridad & Control de Acceso por Grupo (RBAC)
+                      </h4>
+                      <p className="text-xs opacity-75 mt-0.5 leading-relaxed">
+                        El acceso al módulo de Reportes está protegido. Los administradores pueden otorgar o restringir el permiso <strong className="font-mono">REPORTES</strong> (Lectura / Escritura / Sin Acceso) a cualquier grupo de funcionarios desde la pestaña de Grupos.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("grupos")}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-xl border text-xs font-bold transition-all hover:bg-blue-500/10 shrink-0"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-primary)" }}
+                  >
+                    <span>Configurar Permisos de Grupo</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: ACTIVIDAD DE USUARIOS (LOG FORENSE & MOVIMIENTOS) */}
+          {activeTab === "actividad" && (
+            <div className="space-y-6">
+              {/* Executive Header Card */}
+              <div
+                className="p-6 rounded-2xl border shadow-sm relative overflow-hidden"
+                style={{
+                  backgroundColor: "var(--color-surface)",
+                  borderColor: "var(--color-border)",
+                }}
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+                  <div className="space-y-2 max-w-3xl">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                        <Activity className="w-3.5 h-3.5" />
+                        <span>Log Forense de Actividad</span>
+                      </span>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                        Solo Administrador
+                      </span>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                        Ley 21.719
+                      </span>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                        Trazabilidad IP & Sesión
+                      </span>
+                    </div>
+
+                    <h3 className="text-xl font-black tracking-tight" style={{ color: "var(--color-text)" }}>
+                      Supervisión Forense y Registro de Movimientos de Usuarios
+                    </h3>
+                    <p className="text-xs opacity-75 leading-relaxed">
+                      Auditoría integral en tiempo real de cada interacción dentro del sistema para los Cementerios de San Carlos y Cachapoal. Registra con exactitud la dirección IP de origen, el funcionario responsable, la ruta invocada, el método HTTP y el tiempo de respuesta.
+                    </p>
+                  </div>
+
+                  {/* Actions: Export CSV, Refresh, Auto-Refresh */}
+                  <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      id="btn-export-activity-csv"
+                      onClick={handleExportActivityCsv}
+                      disabled={exportingActivityCsv || activityTotal === 0}
+                      className="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                      title="Exportar archivo CSV con codificación UTF-8 con BOM para Microsoft Excel"
+                    >
+                      {exportingActivityCsv ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5" />
+                      )}
+                      <span>Exportar CSV Excel</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="btn-toggle-activity-autorefresh"
+                      onClick={() => setActivityAutoRefresh(!activityAutoRefresh)}
+                      className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl font-bold text-xs border transition-all ${
+                        activityAutoRefresh
+                          ? "bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/50 shadow-sm"
+                          : "border-gray-200 dark:border-gray-800 opacity-70 hover:opacity-100"
+                      }`}
+                      style={{ borderColor: activityAutoRefresh ? undefined : "var(--color-border)" }}
+                      title="Actualización automática en vivo cada 10 segundos"
+                    >
+                      <Radio className={`w-3.5 h-3.5 ${activityAutoRefresh ? "animate-pulse text-purple-500" : ""}`} />
+                      <span>{activityAutoRefresh ? "En Vivo (10s)" : "Auto (10s)"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="btn-refresh-activity"
+                      onClick={() => fetchActivityLogs()}
+                      disabled={loadingActivity}
+                      className="p-2.5 rounded-xl border hover:bg-slate-100 dark:hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 shrink-0"
+                      style={{ borderColor: "var(--color-border)" }}
+                      title="Actualizar registro ahora"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${loadingActivity ? "animate-spin text-purple-500" : ""}`} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* KPIs Summary Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                <div
+                  className="p-4 rounded-xl border shadow-sm transition-all hover:border-purple-500/40"
+                  style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">Movimientos</span>
+                    <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                      <Activity className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black mt-2 text-purple-600 dark:text-purple-400">
+                    {activityResumen.total_movimientos.toLocaleString("es-CL")}
+                  </div>
+                  <div className="text-[10px] opacity-50 mt-0.5">Operaciones totales</div>
+                </div>
+
+                <div
+                  className="p-4 rounded-xl border shadow-sm transition-all hover:border-blue-500/40"
+                  style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">Usuarios</span>
+                    <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <Users className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black mt-2 text-blue-600 dark:text-blue-400">
+                    {activityResumen.usuarios_unicos}
+                  </div>
+                  <div className="text-[10px] opacity-50 mt-0.5">Cuentas activas</div>
+                </div>
+
+                <div
+                  className="p-4 rounded-xl border shadow-sm transition-all hover:border-cyan-500/40"
+                  style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">IPs Únicas</span>
+                    <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                      <Globe className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black mt-2 text-cyan-600 dark:text-cyan-400">
+                    {activityResumen.ips_unicas}
+                  </div>
+                  <div className="text-[10px] opacity-50 mt-0.5">Orígenes de red</div>
+                </div>
+
+                <div
+                  className="p-4 rounded-xl border shadow-sm transition-all hover:border-amber-500/40"
+                  style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">Modificaciones</span>
+                    <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black mt-2 text-amber-600 dark:text-amber-400">
+                    {activityResumen.modificaciones_count}
+                  </div>
+                  <div className="text-[10px] opacity-50 mt-0.5">POST / PUT / DELETE</div>
+                </div>
+
+                <div
+                  className="p-4 rounded-xl border shadow-sm transition-all hover:border-emerald-500/40"
+                  style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">Consultas</span>
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <Eye className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black mt-2 text-emerald-600 dark:text-emerald-400">
+                    {activityResumen.lecturas_count}
+                  </div>
+                  <div className="text-[10px] opacity-50 mt-0.5">Lecturas GET</div>
+                </div>
+
+                <div
+                  className="p-4 rounded-xl border shadow-sm transition-all hover:border-rose-500/40"
+                  style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider opacity-60">Rechazos / 4xx</span>
+                    <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black mt-2 text-rose-600 dark:text-rose-400">
+                    {activityResumen.errores_count}
+                  </div>
+                  <div className="text-[10px] opacity-50 mt-0.5">Bloqueados / Fallos</div>
+                </div>
+              </div>
+
+              {/* Filter and Search Bar */}
+              <div
+                className="p-5 rounded-2xl border shadow-sm space-y-3"
+                style={{
+                  backgroundColor: "var(--color-surface)",
+                  borderColor: "var(--color-border)",
+                }}
+              >
+                <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider opacity-70">
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Filtros Dinámicos de Actividad</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {/* Search box */}
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 opacity-40" />
+                    <input
+                      id="input-search-activity"
+                      type="text"
+                      placeholder="Buscar usuario, IP, ruta..."
+                      value={activitySearch}
+                      onChange={(e) => {
+                        setActivitySearch(e.target.value);
+                        setActivityPage(0);
+                      }}
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border text-xs outline-none focus:ring-2 focus:ring-purple-500 font-sans"
+                      style={{
+                        backgroundColor: "var(--color-bg)",
+                        borderColor: "var(--color-border)",
+                      }}
+                    />
+                  </div>
+
+                  {/* Module select */}
+                  <select
+                    id="select-activity-module"
+                    value={activityModule}
+                    onChange={(e) => {
+                      setActivityModule(e.target.value);
+                      setActivityPage(0);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border text-xs outline-none focus:ring-2 focus:ring-purple-500 font-sans font-medium"
+                    style={{
+                      backgroundColor: "var(--color-bg)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <option value="todos">Todos los Módulos</option>
+                    <option value="INHUMACIONES">Inhumaciones & Defunciones</option>
+                    <option value="UBICACIONES">Ubicaciones & Catastro GIS</option>
+                    <option value="DERECHOS">Concesiones & Arriendos</option>
+                    <option value="RESERVAS">Reservas de Sepulturas</option>
+                    <option value="REPORTES">Reportes & Estadísticas (DS 357)</option>
+                    <option value="AUTENTICACION">Autenticación & Login</option>
+                    <option value="USUARIOS">Usuarios & Credenciales</option>
+                    <option value="GRUPOS_PERMISOS">Grupos & Permisos (RBAC)</option>
+                    <option value="EXHUMACIONES">Exhumaciones & Traslados</option>
+                    <option value="MAESTROS">Obras & Maestros</option>
+                    <option value="CAMPO_TERRENO">Faenas de Terreno</option>
+                    <option value="CERTIFICADOS">Certificados Oficiales</option>
+                    <option value="PORTAL_PUBLICO">Portal Ciudadano</option>
+                    <option value="AUDITORIA">Auditoría HMAC</option>
+                    <option value="TEMAS">Temas & Apariencia</option>
+                    <option value="SISTEMA">Sistema General</option>
+                  </select>
+
+                  {/* Method select */}
+                  <select
+                    id="select-activity-method"
+                    value={activityMethod}
+                    onChange={(e) => {
+                      setActivityMethod(e.target.value);
+                      setActivityPage(0);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border text-xs outline-none focus:ring-2 focus:ring-purple-500 font-sans font-medium"
+                    style={{
+                      backgroundColor: "var(--color-bg)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <option value="todos">Todos los Métodos</option>
+                    <option value="GET">GET — Lectura / Consulta</option>
+                    <option value="POST">POST — Creación / Envío</option>
+                    <option value="PUT">PUT — Actualización</option>
+                    <option value="PATCH">PATCH — Modificación Parcial</option>
+                    <option value="DELETE">DELETE — Eliminación</option>
+                  </select>
+
+                  {/* Status select */}
+                  <select
+                    id="select-activity-status"
+                    value={activityStatus}
+                    onChange={(e) => {
+                      setActivityStatus(e.target.value);
+                      setActivityPage(0);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border text-xs outline-none focus:ring-2 focus:ring-purple-500 font-sans font-medium"
+                    style={{
+                      backgroundColor: "var(--color-bg)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <option value="todos">Todos los Estados HTTP</option>
+                    <option value="exito">Exitosos (200 - 399)</option>
+                    <option value="error">Errores & Denegados (400 - 599)</option>
+                  </select>
+
+                  {/* Date range select */}
+                  <select
+                    id="select-activity-date"
+                    value={activityDateRange}
+                    onChange={(e) => {
+                      setActivityDateRange(e.target.value);
+                      setActivityPage(0);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border text-xs outline-none focus:ring-2 focus:ring-purple-500 font-sans font-medium"
+                    style={{
+                      backgroundColor: "var(--color-bg)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <option value="todos">Todo el Historial</option>
+                    <option value="hoy">Hoy</option>
+                    <option value="7dias">Últimos 7 días</option>
+                    <option value="30dias">Últimos 30 días</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Activity Log Data Table */}
+              <div
+                className="rounded-2xl border shadow-sm overflow-hidden"
+                style={{
+                  backgroundColor: "var(--color-surface)",
+                  borderColor: "var(--color-border)",
+                }}
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg)" }}>
+                        <th className="py-3 px-4 font-bold uppercase tracking-wider text-[11px] opacity-70">Fecha / Hora</th>
+                        <th className="py-3 px-4 font-bold uppercase tracking-wider text-[11px] opacity-70">Usuario</th>
+                        <th className="py-3 px-4 font-bold uppercase tracking-wider text-[11px] opacity-70">IP de Origen</th>
+                        <th className="py-3 px-4 font-bold uppercase tracking-wider text-[11px] opacity-70">Movimiento</th>
+                        <th className="py-3 px-4 font-bold uppercase tracking-wider text-[11px] opacity-70">Descripción de Actividad</th>
+                        <th className="py-3 px-4 font-bold uppercase tracking-wider text-[11px] opacity-70 text-center">Estado</th>
+                        <th className="py-3 px-4 font-bold uppercase tracking-wider text-[11px] opacity-70 text-right">Latencia</th>
+                        <th className="py-3 px-4 font-bold uppercase tracking-wider text-[11px] opacity-70 text-center">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y" style={{ borderColor: "var(--color-border)" }}>
+                      {loadingActivity ? (
+                        <tr>
+                          <td colSpan={8} className="py-12 text-center opacity-60">
+                            <div className="flex flex-col items-center justify-center space-y-2">
+                              <RefreshCw className="w-6 h-6 animate-spin text-purple-600" />
+                              <span className="text-xs font-medium">Cargando registros de actividad...</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : activityLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="py-12 text-center opacity-60">
+                            <div className="flex flex-col items-center justify-center space-y-2">
+                              <Activity className="w-8 h-8 opacity-30" />
+                              <span className="text-xs font-semibold">No se encontraron movimientos registrados con los filtros seleccionados</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActivitySearch("");
+                                  setActivityModule("todos");
+                                  setActivityMethod("todos");
+                                  setActivityStatus("todos");
+                                  setActivityDateRange("todos");
+                                }}
+                                className="text-xs text-purple-600 underline font-bold mt-1"
+                              >
+                                Limpiar filtros
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        activityLogs.map((log) => {
+                          const dateObj = new Date(log.timestamp);
+                          const dateStr = dateObj.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
+                          const timeStr = dateObj.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+                          // Method Badge
+                          const methodColors: Record<string, string> = {
+                            GET: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30",
+                            POST: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+                            PUT: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
+                            PATCH: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
+                            DELETE: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30",
+                          };
+
+                          // Status Badge
+                          const isSuccess = log.status_code >= 200 && log.status_code < 400;
+                          const isDenied = log.status_code === 401 || log.status_code === 403;
+
+                          return (
+                            <tr
+                              key={log.id}
+                              className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors"
+                            >
+                              {/* Timestamp */}
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <div className="font-mono font-bold text-xs" style={{ color: "var(--color-text)" }}>
+                                  {timeStr}
+                                </div>
+                                <div className="text-[11px] opacity-60">{dateStr}</div>
+                              </td>
+
+                              {/* User */}
+                              <td className="py-3 px-4">
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-7 h-7 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 flex items-center justify-center font-bold text-xs shrink-0">
+                                    {(log.username || "A").charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div className="font-bold flex items-center space-x-1.5" style={{ color: "var(--color-text)" }}>
+                                      <span>{log.username}</span>
+                                      {log.user_role === "ADMINISTRADOR" && (
+                                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold border border-purple-500/30">
+                                          Admin
+                                        </span>
+                                      )}
+                                    </div>
+                                    {log.user_rut && (
+                                      <div className="text-[10px] font-mono opacity-60">{log.user_rut}</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* IP Address */}
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <div className="flex items-center space-x-1.5">
+                                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border" style={{ borderColor: "var(--color-border)" }}>
+                                    {log.ip_address}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(log.ip_address);
+                                      setCopiedIp(log.ip_address);
+                                      setTimeout(() => setCopiedIp(null), 2000);
+                                    }}
+                                    className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-xs opacity-60 hover:opacity-100 transition-opacity"
+                                    title="Copiar IP"
+                                  >
+                                    {copiedIp === log.ip_address ? (
+                                      <Check className="w-3 h-3 text-emerald-500" />
+                                    ) : (
+                                      <Copy className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* Movement & Module */}
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <div className="flex items-center space-x-1.5">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-black border uppercase tracking-wider ${
+                                      methodColors[log.metodo] || "bg-slate-500/10 text-slate-700 border-slate-500/30"
+                                    }`}
+                                  >
+                                    {log.metodo}
+                                  </span>
+                                  <span className="text-xs font-bold opacity-80">{log.modulo}</span>
+                                </div>
+                              </td>
+
+                              {/* Description */}
+                              <td className="py-3 px-4 max-w-xs md:max-w-md">
+                                <div className="font-semibold text-xs leading-snug" style={{ color: "var(--color-text)" }}>
+                                  {log.descripcion}
+                                </div>
+                                <div className="text-[10px] font-mono opacity-50 truncate mt-0.5">
+                                  {log.ruta}
+                                </div>
+                              </td>
+
+                              {/* HTTP Status */}
+                              <td className="py-3 px-4 whitespace-nowrap text-center">
+                                <span
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                                    isSuccess
+                                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                                      : isDenied
+                                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                                      : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30"
+                                  }`}
+                                >
+                                  {log.status_code}
+                                </span>
+                              </td>
+
+                              {/* Latency */}
+                              <td className="py-3 px-4 whitespace-nowrap text-right font-mono text-[11px] opacity-75">
+                                {log.duracion_ms ? `${log.duracion_ms} ms` : "—"}
+                              </td>
+
+                              {/* Detail button */}
+                              <td className="py-3 px-4 whitespace-nowrap text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedActivityDetail(log)}
+                                  className="p-1.5 rounded-lg border hover:bg-purple-500/10 hover:text-purple-600 transition-colors"
+                                  style={{ borderColor: "var(--color-border)" }}
+                                  title="Ver detalles completos del movimiento"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div
+                  className="flex flex-col sm:flex-row items-center justify-between p-4 border-t gap-3"
+                  style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg)" }}
+                >
+                  <div className="text-xs opacity-70">
+                    Mostrando{" "}
+                    <span className="font-bold">
+                      {activityTotal > 0 ? activityPage * activityLimit + 1 : 0}
+                    </span>{" "}
+                    a{" "}
+                    <span className="font-bold">
+                      {Math.min((activityPage + 1) * activityLimit, activityTotal)}
+                    </span>{" "}
+                    de <span className="font-bold">{activityTotal}</span> movimientos
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <select
+                      value={activityLimit}
+                      onChange={(e) => {
+                        setActivityLimit(Number(e.target.value));
+                        setActivityPage(0);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg border text-xs outline-none font-semibold"
+                      style={{
+                        backgroundColor: "var(--color-surface)",
+                        borderColor: "var(--color-border)",
+                      }}
+                    >
+                      <option value={25}>25 por página</option>
+                      <option value={50}>50 por página</option>
+                      <option value={100}>100 por página</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      disabled={activityPage === 0}
+                      onClick={() => setActivityPage((p) => Math.max(0, p - 1))}
+                      className="px-3 py-1.5 rounded-lg border text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
+                      style={{ borderColor: "var(--color-border)" }}
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-xs font-bold px-2">
+                      Página {activityPage + 1} de {Math.max(1, Math.ceil(activityTotal / activityLimit))}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={(activityPage + 1) * activityLimit >= activityTotal}
+                      onClick={() => setActivityPage((p) => p + 1)}
+                      className="px-3 py-1.5 rounded-lg border text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
+                      style={{ borderColor: "var(--color-border)" }}
+                    >
+                      Siguiente
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2662,6 +3933,176 @@ export default function AdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Detalle de Movimiento de Usuario */}
+      {selectedActivityDetail && (
+        <div
+          id="modal-activity-detail-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedActivityDetail(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+        >
+          <div
+            id="modal-activity-detail-dialog"
+            className="w-full max-w-2xl rounded-2xl border shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+            style={{
+              backgroundColor: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+            }}
+          >
+            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--color-border)" }}>
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base" style={{ color: "var(--color-text)" }}>
+                    Detalle Forense del Movimiento #{selectedActivityDetail.id}
+                  </h3>
+                  <p className="text-xs opacity-60">
+                    Registro de auditoría conforme a Ley 21.719
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedActivityDetail(null)}
+                className="p-1.5 rounded-xl border hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                style={{ borderColor: "var(--color-border)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Grid of detail fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-3 rounded-xl border bg-slate-50 dark:bg-slate-900/50" style={{ borderColor: "var(--color-border)" }}>
+                <span className="font-semibold opacity-60 uppercase text-[10px] block">Fecha y Hora Exacta</span>
+                <span className="font-mono font-bold text-sm block mt-0.5">
+                  {new Date(selectedActivityDetail.timestamp).toLocaleString("es-CL", { timeZone: "America/Santiago" })}
+                </span>
+                <span className="text-[10px] opacity-50 font-mono">{selectedActivityDetail.timestamp}</span>
+              </div>
+
+              <div className="p-3 rounded-xl border bg-slate-50 dark:bg-slate-900/50" style={{ borderColor: "var(--color-border)" }}>
+                <span className="font-semibold opacity-60 uppercase text-[10px] block">Usuario / Funcionario</span>
+                <span className="font-bold text-sm block mt-0.5 text-purple-600 dark:text-purple-400">
+                  {selectedActivityDetail.username}
+                </span>
+                <span className="text-[10px] opacity-60 block">
+                  RUT: {selectedActivityDetail.user_rut || "N/A"} | Rol: {selectedActivityDetail.user_role || "Sin rol"}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl border bg-slate-50 dark:bg-slate-900/50" style={{ borderColor: "var(--color-border)" }}>
+                <span className="font-semibold opacity-60 uppercase text-[10px] block">Dirección IP de Origen</span>
+                <div className="flex items-center space-x-2 mt-0.5">
+                  <span className="font-mono font-bold text-sm">{selectedActivityDetail.ip_address}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedActivityDetail.ip_address);
+                      setCopiedIp(selectedActivityDetail.ip_address);
+                      setTimeout(() => setCopiedIp(null), 2000);
+                    }}
+                    className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-xs"
+                    title="Copiar IP"
+                  >
+                    {copiedIp === selectedActivityDetail.ip_address ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl border bg-slate-50 dark:bg-slate-900/50" style={{ borderColor: "var(--color-border)" }}>
+                <span className="font-semibold opacity-60 uppercase text-[10px] block">Resultado HTTP & Latencia</span>
+                <div className="flex items-center space-x-2 mt-0.5">
+                  <span className={`px-2 py-0.5 rounded text-xs font-black border ${
+                    selectedActivityDetail.status_code < 400
+                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                      : "bg-rose-500/10 text-rose-600 border-rose-500/30"
+                  }`}>
+                    HTTP {selectedActivityDetail.status_code}
+                  </span>
+                  <span className="font-mono text-xs opacity-75">
+                    {selectedActivityDetail.duracion_ms ? `${selectedActivityDetail.duracion_ms} ms` : "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Movement description & Endpoint */}
+            <div className="p-3.5 rounded-xl border bg-slate-50 dark:bg-slate-900/50 space-y-1.5" style={{ borderColor: "var(--color-border)" }}>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold opacity-60 uppercase text-[10px]">Descripción del Movimiento</span>
+                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-700 dark:text-purple-300">
+                  {selectedActivityDetail.modulo} / {selectedActivityDetail.accion}
+                </span>
+              </div>
+              <p className="font-bold text-xs" style={{ color: "var(--color-text)" }}>
+                {selectedActivityDetail.descripcion}
+              </p>
+              <div className="font-mono text-[11px] p-2 rounded bg-black/10 dark:bg-black/30 break-all">
+                <span className="font-bold text-blue-600 dark:text-blue-400 mr-2">{selectedActivityDetail.metodo}</span>
+                {selectedActivityDetail.ruta}
+              </div>
+            </div>
+
+            {/* User Agent */}
+            {selectedActivityDetail.user_agent && (
+              <div className="p-3 rounded-xl border bg-slate-50 dark:bg-slate-900/50 space-y-1" style={{ borderColor: "var(--color-border)" }}>
+                <span className="font-semibold opacity-60 uppercase text-[10px]">Navegador & Dispositivo (User-Agent)</span>
+                <p className="font-mono text-[11px] opacity-80 break-all">
+                  {selectedActivityDetail.user_agent}
+                </p>
+              </div>
+            )}
+
+            {/* JSON Details */}
+            {selectedActivityDetail.detalles && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold opacity-60 uppercase text-[10px]">Parámetros & Carga Útil (Payload)</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(JSON.stringify(selectedActivityDetail.detalles, null, 2));
+                    }}
+                    className="flex items-center space-x-1 text-[11px] text-purple-600 dark:text-purple-400 font-bold hover:underline"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>Copiar JSON</span>
+                  </button>
+                </div>
+                <pre
+                  className="p-3 rounded-xl border font-mono text-[11px] overflow-x-auto max-h-48"
+                  style={{
+                    backgroundColor: "var(--color-bg)",
+                    borderColor: "var(--color-border)",
+                  }}
+                >
+                  {JSON.stringify(selectedActivityDetail.detalles, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex justify-end pt-3 border-t" style={{ borderColor: "var(--color-border)" }}>
+              <button
+                type="button"
+                onClick={() => setSelectedActivityDetail(null)}
+                className="px-5 py-2 rounded-xl font-bold text-xs bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+              >
+                Cerrar Detalle
+              </button>
+            </div>
           </div>
         </div>
       )}

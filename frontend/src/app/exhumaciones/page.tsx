@@ -305,9 +305,6 @@ export default function ExhumacionesPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
               Exhumaciones & Traslados
             </h1>
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
-              EETT 3.6
-            </span>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             Trazabilidad completa de reducciones, exhumaciones y traslados internos o externos con resolución
@@ -524,7 +521,7 @@ export default function ExhumacionesPage() {
                   <h3 className="text-lg font-extrabold" style={{ color: "var(--color-text)" }}>
                     Registrar Exhumación o Traslado
                   </h3>
-                  <p className="text-xs text-muted-foreground">EETT 3.6 • Acto de Exhumación, Reducción o Traslado</p>
+                  <p className="text-xs text-muted-foreground">Acto de Exhumación, Reducción o Traslado</p>
                 </div>
               </div>
               <button 
@@ -730,7 +727,7 @@ export default function ExhumacionesPage() {
                   />
                   <div>
                     <span className="font-bold text-xs" style={{ color: "var(--color-text)" }}>
-                      Liberar sepultura de origen tras la faena (EETT 3.6)
+                      Liberar sepultura de origen tras la faena
                     </span>
                     <p className="text-[10px] text-muted-foreground">
                       Disminuye la capacidad ocupada y restituye la fosa para nuevas inhumaciones.

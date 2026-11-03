@@ -3,9 +3,9 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.infrastructure.db.session import get_db
-from app.domain.models import Exhumacion, Inhumacion, Ubicacion, Persona, Usuario, RolUsuario
+from app.domain.models import Exhumacion, Inhumacion, Ubicacion, Persona, Usuario, RolUsuario, ModuloSistema
 from app.domain.schemas.exhumacion import ExhumacionCreate, ExhumacionResponse
-from app.api.deps import require_role, get_current_user_optional, get_current_user
+from app.api.deps import require_role, get_current_user_optional, get_current_user, require_module_access
 from app.infrastructure.db.audit_listener import AuditService
 from etl.rut_validator import validate_and_format_rut
 
@@ -83,7 +83,7 @@ def list_exhumaciones(
 def create_exhumacion(
     req: ExhumacionCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_role(RolUsuario.ADMINISTRADOR.value, RolUsuario.ADMINISTRATIVO.value))
+    current_user: Usuario = Depends(require_module_access(ModuloSistema.INHUMACIONES.value, "WRITE"))
 ):
     """
     Registers an exhumation and/or transfer (EETT 3.6 & Annex 2 Row 8 / A2-08).

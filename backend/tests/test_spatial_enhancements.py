@@ -18,8 +18,8 @@ def test_mapa_sectores():
     assert "slots_disponibles" in first
 
 def test_mapa_cuadricula():
-    # Fetch grid slots for San Carlos (default sector or specific PAB-A)
-    res = client.get("/api/v1/ubicaciones/mapa/cuadricula?cementerio_id=1&sector_codigo=PAB-A")
+    # Fetch grid slots for San Carlos (default sector)
+    res = client.get("/api/v1/ubicaciones/mapa/cuadricula?cementerio_id=1")
     assert res.status_code == 200
     data = res.json()
     assert "sector_codigo" in data
@@ -53,6 +53,16 @@ def test_busqueda_autocomplete_enhanced():
     assert res2.status_code == 200
 
 def test_certificados_flow():
+    # 0. Unauthenticated emission must fail (SEC-02)
+    unauth = client.post("/api/v1/certificados/emitir", json={})
+    assert unauth.status_code == 401
+
+    # Login as admin
+    login_res = client.post("/api/v1/auth/login", json={"username": "admin", "password": "AdminCem2026!"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
     # Emit certificate
     payload = {
         "tipo_certificado": "INHUMACION",
@@ -63,7 +73,7 @@ def test_certificados_flow():
         "rut_titular": "15.678.912-3",
         "observaciones": "Trámite de posesión efectiva"
     }
-    res = client.post("/api/v1/certificados/emitir", json=payload)
+    res = client.post("/api/v1/certificados/emitir", json=payload, headers=headers)
     assert res.status_code == 201
     cert = res.json()
     assert "folio" in cert

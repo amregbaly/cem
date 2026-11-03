@@ -296,9 +296,6 @@ export default function ModoTerrenoPage() {
               <h1 className="text-xl font-black" style={{ color: "var(--color-text)" }}>
                 Modo Terreno
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                PWA Sepultureros
-              </span>
             </div>
             <p className="text-xs text-gray-500">
               Agenda diaria de faenas e inhumaciones

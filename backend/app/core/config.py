@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = Field(
-        default="postgresql+psycopg2://cem_admin:cem_secure_password_2026@localhost:5432/cem_db"
+        default="sqlite:///./cem_dev.db"
     )
     SQLITE_TEST_DB: str = Field(default="sqlite:///./test_cemetery.db")
 
@@ -36,11 +36,18 @@ class Settings(BaseSettings):
 
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000"]
+        default=[
+            "http://localhost:3000",
+            "http://localhost:5011",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5011",
+            "https://munisancarlosdemo.voxera.net",
+            "http://munisancarlosdemo.voxera.net"
+        ]
     )
 
     model_config = {
-        "env_file": ".env",
+        "env_file": str(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")),
         "env_file_encoding": "utf-8",
         "extra": "ignore"
     }

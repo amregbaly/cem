@@ -31,7 +31,17 @@ def test_password_policy():
 
 
 def test_exit_package_endpoint(client):
-    res = client.get("/api/v1/auditoria/exit-package")
+    # 1. Unauthenticated request must be rejected (SEC-01)
+    unauth_res = client.get("/api/v1/auditoria/exit-package")
+    assert unauth_res.status_code == 401
+
+    # 2. Admin authenticated request succeeds
+    login_res = client.post("/api/v1/auth/login", json={"username": "admin", "password": "AdminCem2026!"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    res = client.get("/api/v1/auditoria/exit-package", headers=headers)
     assert res.status_code == 200
     assert res.headers["content-type"] == "application/zip"
     assert "paquete_salida_cementerio" in res.headers["content-disposition"]
@@ -107,7 +117,21 @@ def test_account_lockout(client):
 
 
 def test_maestros_endpoints(client):
-    # 1. Register a new mason
+    # 0. Unauthenticated attempt must be rejected (SEC-04)
+    unauth = client.post("/api/v1/maestros", json={
+        "rut": "12345678-5",
+        "nombres": "JUAN CARLOS",
+        "apellido_paterno": "ROBLES"
+    })
+    assert unauth.status_code == 401
+
+    # Login as admin
+    login_res = client.post("/api/v1/auth/login", json={"username": "admin", "password": "AdminCem2026!"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Register a new mason with staff token
     res = client.post("/api/v1/maestros", json={
         "rut": "12345678-5",
         "nombres": "JUAN CARLOS",
@@ -115,7 +139,7 @@ def test_maestros_endpoints(client):
         "apellido_materno": "PEREZ",
         "direccion": "Calle Maipú 450, San Carlos",
         "telefono": "+56987654321"
-    })
+    }, headers=headers)
     # Either 201 or 400 if already exists
     assert res.status_code in [201, 400]
 

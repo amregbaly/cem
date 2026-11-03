@@ -343,9 +343,6 @@ export default function ReservasPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text)" }}>
               Reservas de Sepulturas
             </h1>
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-              EETT 3.11
-            </span>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             Gestión municipal de reservas transitorias, control de plazos y liberación de fosas
@@ -573,7 +570,7 @@ export default function ReservasPage() {
                   <h3 className="text-lg font-extrabold" style={{ color: "var(--color-text)" }}>
                     Registrar Reserva de Sepultura
                   </h3>
-                  <p className="text-xs text-muted-foreground">EETT 3.11 • Reserva Transitoria con Bloqueo de Capacidad</p>
+                  <p className="text-xs text-muted-foreground">Reserva Transitoria con Bloqueo de Capacidad</p>
                 </div>
               </div>
               <button 
