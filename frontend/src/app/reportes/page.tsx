@@ -97,30 +97,82 @@ export default function ReportesPage() {
     const savedToken = localStorage.getItem("cem_auth_token");
     const savedUser = localStorage.getItem("cem_auth_user");
 
-    if (savedToken && savedUser) {
+    if (savedToken) {
       setToken(savedToken);
-      try {
-        const parsed = JSON.parse(savedUser);
-        setCurrentUser(parsed);
-
-        // Verify RBAC
-        if (parsed.rol === "ADMINISTRADOR") {
-          setHasPermission(true);
-          setPermissionLevel("WRITE");
-        } else {
-          // Check group permissions from backend or cached user object
-          fetchGroupPermission(savedToken, parsed.grupo_id);
+      let parsed: any = null;
+      if (savedUser) {
+        try {
+          parsed = JSON.parse(savedUser);
+          setCurrentUser(parsed);
+        } catch {
+          parsed = null;
         }
-      } catch {
-        setHasPermission(false);
       }
+
+      // Check role directly (support both 'role' and 'rol')
+      const userRole = (parsed?.role || parsed?.rol || "").toUpperCase();
+      if (userRole === "ADMINISTRADOR" || userRole === "ADMIN") {
+        setHasPermission(true);
+        setPermissionLevel("WRITE");
+        setAuthChecked(true);
+        return;
+      }
+
+      // If not definitively admin, verify against /api/v1/auth/me
+      verifyUserPermissions(savedToken, parsed);
     } else {
       setToken(null);
       setCurrentUser(null);
       setHasPermission(false);
+      setAuthChecked(true);
+    }
+  }, []);
+
+  const verifyUserPermissions = async (authToken: string, cachedUser: any) => {
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        const me = await res.json();
+        setCurrentUser(me);
+        localStorage.setItem("cem_auth_user", JSON.stringify(me));
+
+        const role = (me.rol || me.role || "").toUpperCase();
+        if (role === "ADMINISTRADOR" || role === "ADMIN") {
+          setHasPermission(true);
+          setPermissionLevel("WRITE");
+          setAuthChecked(true);
+          return;
+        }
+
+        // Check if reportes permission is explicitly present in me.permisos
+        if (me.permisos && me.permisos.REPORTES && me.permisos.REPORTES !== "NONE") {
+          setHasPermission(true);
+          setPermissionLevel(me.permisos.REPORTES);
+          setAuthChecked(true);
+          return;
+        }
+
+        const grupoId = me.grupo_id || cachedUser?.grupo_id;
+        if (grupoId) {
+          await fetchGroupPermission(authToken, grupoId);
+          setAuthChecked(true);
+          return;
+        }
+      }
+    } catch {
+      // ignore network errors and fallback to cached
+    }
+
+    if (cachedUser?.grupo_id) {
+      await fetchGroupPermission(authToken, cachedUser.grupo_id);
+    } else {
+      setHasPermission(false);
+      setPermissionLevel("NONE");
     }
     setAuthChecked(true);
-  }, []);
+  };
 
   const fetchGroupPermission = async (authToken: string, grupoId?: number) => {
     if (!grupoId) {

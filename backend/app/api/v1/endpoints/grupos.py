@@ -1,7 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, require_role
+from app.api.deps import get_db, require_role, get_current_user
 from app.domain.models import Usuario, RolUsuario, Grupo, GrupoPermiso, ModuloSistema, NivelAcceso
 from app.domain.schemas.grupo import (
     GrupoResponse,
@@ -120,10 +120,15 @@ def crear_grupo(
 @router.get("/{grupo_id}", response_model=GrupoResponse)
 def obtener_grupo(
     grupo_id: int,
-    current_user: Usuario = Depends(require_role([RolUsuario.ADMINISTRADOR.value])),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get group details and full permission matrix."""
+    if current_user.rol != RolUsuario.ADMINISTRADOR.value and current_user.grupo_id != grupo_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operación restringida. No autorizado para consultar este grupo."
+        )
     g = db.query(Grupo).filter(Grupo.id == grupo_id).first()
     if not g:
         raise HTTPException(status_code=404, detail="Grupo no encontrado.")

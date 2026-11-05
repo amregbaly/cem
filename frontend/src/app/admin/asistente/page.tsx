@@ -79,7 +79,9 @@ export default function AdminAsistentePage() {
     setError(null);
     try {
       const token = localStorage.getItem("cem_auth_token");
-      if (!token) throw new Error("No autenticado");
+      if (!token) {
+        throw new Error("No has iniciado sesión como Administrador. Por favor ingresa a /admin.");
+      }
       const cfg: AsistenteConfig = await getAsistenteConfig(token);
       setHabilitado(cfg.habilitado);
       setProveedor(cfg.proveedor || "gemini");
@@ -88,7 +90,12 @@ export default function AdminAsistentePage() {
       setMaxTokens(cfg.max_tokens);
       setTemperaturaX10(cfg.temperatura_x10);
     } catch (e: any) {
-      setError(e.message || "Error al cargar configuración");
+      const msg = e.message || "";
+      if (msg.includes("Could not validate credentials") || msg.includes("401") || msg.includes("No autenticado")) {
+        setError("Tu sesión en el sistema ha expirado o no estás autenticado como Administrador. Por favor inicia sesión en /admin.");
+      } else {
+        setError(msg || "Error al cargar configuración");
+      }
     } finally {
       setLoading(false);
     }
@@ -100,7 +107,9 @@ export default function AdminAsistentePage() {
     setSuccess(false);
     try {
       const token = localStorage.getItem("cem_auth_token");
-      if (!token) throw new Error("No autenticado");
+      if (!token) {
+        throw new Error("No has iniciado sesión como Administrador. Por favor ingresa a /admin.");
+      }
       const cfg = await updateAsistenteConfig(token, {
         habilitado,
         proveedor,
@@ -116,9 +125,17 @@ export default function AdminAsistentePage() {
     } catch (e: any) {
       try {
         const parsed = JSON.parse(e.message.replace(/^Error \d+: /, ""));
-        setError(parsed.detail || e.message);
+        if (parsed.detail === "Could not validate credentials" || e.message.includes("401")) {
+          setError("Tu sesión en el sistema ha expirado o no estás autenticado como Administrador. Por favor inicia sesión en /admin.");
+        } else {
+          setError(parsed.detail || e.message);
+        }
       } catch {
-        setError(e.message);
+        if (e.message?.includes("Could not validate credentials") || e.message?.includes("401")) {
+          setError("Tu sesión en el sistema ha expirado o no estás autenticado como Administrador. Por favor inicia sesión en /admin.");
+        } else {
+          setError(e.message);
+        }
       }
     } finally {
       setSaving(false);
@@ -440,7 +457,7 @@ export default function AdminAsistentePage() {
               placeholder={
                 apiKeyMasked
                   ? "Ingresar nueva clave para reemplazar..."
-                  : "sk-... o AIza..."
+                  : "AQ-... o AIza... o sk-..."
               }
               autoComplete="off"
               className="w-full px-3 py-2 pr-10 rounded-lg border text-sm font-mono focus:outline-none"
@@ -553,15 +570,29 @@ export default function AdminAsistentePage() {
       {/* Alerts */}
       {error && (
         <div
-          className="flex items-start gap-3 p-4 rounded-xl border text-sm"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border text-sm"
           style={{
             background: "#ef444410",
             borderColor: "#ef444440",
             color: "#ef4444",
           }}
         >
-          <AlertCircle size={16} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
+          <div className="flex items-start gap-3">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+          {error.includes("/admin") && (
+            <a
+              href="/admin"
+              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold self-start sm:self-auto shrink-0 transition-opacity hover:opacity-90"
+              style={{
+                background: "var(--color-primary)",
+                color: "#ffffff",
+              }}
+            >
+              Ir a Iniciar Sesión (/admin)
+            </a>
+          )}
         </div>
       )}
       {success && (

@@ -471,7 +471,9 @@ export default function AdminPage() {
       const userObj = {
         username: data.username,
         nombre_completo: data.nombre_completo,
-        role: data.role,
+        role: data.role || data.rol,
+        rol: data.rol || data.role,
+        grupo_id: data.grupo_id,
       };
       setCurrentUser(userObj);
       localStorage.setItem("cem_auth_token", data.access_token);

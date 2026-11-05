@@ -135,6 +135,8 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         access_token=access_token,
         token_type="bearer",
         role=user.rol,
+        rol=user.rol,
+        grupo_id=user.grupo_id,
         username=user.username,
         nombre_completo=user.nombre_completo,
         requires_2fa=False
@@ -142,8 +144,21 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/me")
-def get_me(current_user: Usuario = Depends(get_current_user)):
+def get_me(
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """Get authenticated user profile."""
+    permisos = {}
+    if current_user.rol == RolUsuario.ADMINISTRADOR.value:
+        # Full access for administrators
+        from app.domain.models.grupo import ModuloSistema
+        for mod in ModuloSistema:
+            permisos[mod.value] = "WRITE"
+    elif current_user.grupo:
+        for p in current_user.grupo.permisos:
+            permisos[p.modulo] = p.acceso
+
     return {
         "id": current_user.id,
         "username": current_user.username,
@@ -151,6 +166,10 @@ def get_me(current_user: Usuario = Depends(get_current_user)):
         "nombre_completo": current_user.nombre_completo,
         "rut": current_user.rut,
         "rol": current_user.rol,
+        "role": current_user.rol,
+        "grupo_id": current_user.grupo_id,
+        "grupo_nombre": current_user.grupo.nombre if current_user.grupo else None,
+        "permisos": permisos,
         "totp_enabled": current_user.totp_enabled
     }
 

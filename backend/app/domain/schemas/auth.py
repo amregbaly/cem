@@ -6,6 +6,8 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     role: str
+    rol: Optional[str] = None
+    grupo_id: Optional[int] = None
     username: str
     nombre_completo: str
     requires_2fa: bool = False
